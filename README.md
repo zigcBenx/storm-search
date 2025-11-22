@@ -2,6 +2,8 @@
 
 > Lightning-fast PhpStorm-style global search for VS Code with split-panel preview and syntax highlighting
 
+[Install on the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Benxlabs.storm-search)
+
 ![Demo](images/demo.gif)
 
 ## ✨ Features
