@@ -1,0 +1,65 @@
+{
+  "name": "storm-search",
+  "displayName": "Storm Search",
+  "description": "⚡ Lightning-fast PhpStorm-style global search with split-panel preview and syntax highlighting. Search your entire codebase instantly!",
+  "version": "1.0.0",
+  "publisher": "Benxlabs",
+  "author": {
+    "name": "Ziga"
+  },
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ziga/storm-search"
+  },
+  "keywords": [
+    "search",
+    "find",
+    "global search",
+    "phpstorm",
+    "code search",
+    "file search",
+    "workspace search",
+    "preview"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "custom-search.openSearch",
+        "title": "Storm Search: Open Search"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "custom-search.openSearch",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "editorTextFocus || !editorFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.59.0",
+    "@typescript-eslint/parser": "^5.59.0",
+    "eslint": "^8.41.0",
+    "typescript": "^5.0.4"
+  }
+}
