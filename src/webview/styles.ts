@@ -89,6 +89,20 @@ export function getStyles(): string {
             background: var(--vscode-list-hoverBackground);
         }
 
+        .file-icon {
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+        }
+
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         .match-item {
             padding: 6px 16px 6px 38px;
             font-size: 12px;
