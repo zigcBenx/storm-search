@@ -36,11 +36,15 @@
       {
         "command": "custom-search.openSearch",
         "title": "Storm Search: Open Search"
+      },
+      {
+        "command": "custom-search.openNewSearchTab",
+        "title": "Storm Search: Open New Search Tab"
       }
     ],
     "keybindings": [
       {
-        "command": "custom-search.openSearch",
+        "command": "custom-search.openNewSearchTab",
         "key": "ctrl+shift+f",
         "mac": "cmd+shift+f",
         "when": "editorTextFocus || !editorFocus"

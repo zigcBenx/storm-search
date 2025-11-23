@@ -6,11 +6,12 @@ import { SyntaxHighlightService } from './services/SyntaxHighlightService';
 import { getWebviewContent } from './webview/webviewContent';
 
 export class WebviewManager {
-    private panel: vscode.WebviewPanel | undefined;
+    private panels: Map<string, vscode.WebviewPanel> = new Map();
     private searchService: SearchService;
     private fileService: FileService;
     private syntaxHighlightService: SyntaxHighlightService;
     private disposables: vscode.Disposable[] = [];
+    private panelCounter: number = 0;
 
     constructor(private context: vscode.ExtensionContext) {
         this.searchService = new SearchService();
@@ -19,24 +20,36 @@ export class WebviewManager {
     }
 
     show(): void {
-        if (this.panel) {
-            this.panel.reveal();
+        // If there's at least one panel, reveal the most recent one
+        if (this.panels.size > 0) {
+            const lastPanel = Array.from(this.panels.values()).pop();
+            lastPanel?.reveal();
             return;
         }
 
         this.createPanel();
     }
 
+    showNewTab(): void {
+        // Always create a new panel
+        this.createPanel();
+    }
+
     dispose(): void {
-        this.panel?.dispose();
+        this.panels.forEach(panel => panel.dispose());
+        this.panels.clear();
         this.disposables.forEach(d => d.dispose());
         this.syntaxHighlightService.dispose();
     }
 
     private createPanel(): void {
-        this.panel = vscode.window.createWebviewPanel(
+        this.panelCounter++;
+        const panelId = `search-${this.panelCounter}`;
+        const tabNumber = this.panels.size + 1;
+
+        const panel = vscode.window.createWebviewPanel(
             'customSearch',
-            'Search',
+            `Search ${tabNumber}`,
             vscode.ViewColumn.Active,
             {
                 enableScripts: true,
@@ -44,19 +57,17 @@ export class WebviewManager {
             }
         );
 
-        this.panel.webview.html = getWebviewContent();
-        this.setupMessageHandler();
-        this.setupPanelDisposal();
+        this.panels.set(panelId, panel);
+
+        panel.webview.html = getWebviewContent();
+        this.setupMessageHandler(panelId, panel);
+        this.setupPanelDisposal(panelId, panel);
     }
 
-    private setupMessageHandler(): void {
-        if (!this.panel) {
-            return;
-        }
-
-        const messageHandler = this.panel.webview.onDidReceiveMessage(
+    private setupMessageHandler(panelId: string, panel: vscode.WebviewPanel): void {
+        const messageHandler = panel.webview.onDidReceiveMessage(
             async (message: WebviewMessage) => {
-                await this.handleMessage(message);
+                await this.handleMessage(panelId, panel, message);
             },
             undefined,
             this.context.subscriptions
@@ -65,41 +76,37 @@ export class WebviewManager {
         this.disposables.push(messageHandler);
     }
 
-    private async handleMessage(message: WebviewMessage): Promise<void> {
+    private async handleMessage(panelId: string, panel: vscode.WebviewPanel, message: WebviewMessage): Promise<void> {
         switch (message.command) {
             case 'close':
-                this.panel?.dispose();
+                panel.dispose();
                 break;
 
             case 'search':
                 if (message.text) {
-                    await this.handleSearch(message.text);
+                    await this.handleSearch(panel, message.text);
                 }
                 break;
 
             case 'getFileContent':
                 if (message.filePath) {
-                    await this.handleGetFileContent(message.filePath);
+                    await this.handleGetFileContent(panel, message.filePath);
                 }
                 break;
 
             case 'openFile':
                 if (message.filePath && message.line !== undefined) {
-                    await this.handleOpenFile(message.filePath, message.line);
+                    await this.handleOpenFile(panel, message.filePath, message.line);
                 }
                 break;
         }
     }
 
-    private async handleSearch(query: string): Promise<void> {
-        if (!this.panel) {
-            return;
-        }
-
+    private async handleSearch(panel: vscode.WebviewPanel, query: string): Promise<void> {
         try {
             const results = await this.searchService.search(query);
 
-            this.panel.webview.postMessage({
+            panel.webview.postMessage({
                 command: 'searchResults',
                 results
             });
@@ -108,17 +115,13 @@ export class WebviewManager {
         }
     }
 
-    private async handleGetFileContent(filePath: string): Promise<void> {
-        if (!this.panel) {
-            return;
-        }
-
+    private async handleGetFileContent(panel: vscode.WebviewPanel, filePath: string): Promise<void> {
         try {
             const content = await this.fileService.getFileContent(filePath);
             const lines = content.split('\n');
             const colorizedLines = await this.syntaxHighlightService.highlightLines(lines, filePath);
 
-            this.panel.webview.postMessage({
+            panel.webview.postMessage({
                 command: 'fileContent',
                 filePath,
                 content,
@@ -129,25 +132,19 @@ export class WebviewManager {
         }
     }
 
-    private async handleOpenFile(filePath: string, line: number): Promise<void> {
+    private async handleOpenFile(panel: vscode.WebviewPanel, filePath: string, line: number): Promise<void> {
         try {
             await this.fileService.openFileAtLocation(filePath, line);
-            this.panel?.dispose();
+            panel.dispose();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error}`);
         }
     }
 
-    private setupPanelDisposal(): void {
-        if (!this.panel) {
-            return;
-        }
-
-        this.panel.onDidDispose(
+    private setupPanelDisposal(panelId: string, panel: vscode.WebviewPanel): void {
+        panel.onDidDispose(
             () => {
-                this.panel = undefined;
-                this.disposables.forEach(d => d.dispose());
-                this.disposables = [];
+                this.panels.delete(panelId);
             },
             null,
             this.context.subscriptions

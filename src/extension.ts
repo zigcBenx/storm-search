@@ -13,7 +13,14 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     );
 
-    context.subscriptions.push(openSearchCommand);
+    const openNewSearchTabCommand = vscode.commands.registerCommand(
+        'custom-search.openNewSearchTab',
+        () => {
+            webviewManager?.showNewTab();
+        }
+    );
+
+    context.subscriptions.push(openSearchCommand, openNewSearchTabCommand);
 }
 
 export function deactivate(): void {
