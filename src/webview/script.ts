@@ -21,7 +21,7 @@ window.addEventListener('message', event => {
             handleSearchResults(message.results);
             break;
         case 'fileContent':
-            handleFileContent(message.filePath, message.content);
+            handleFileContent(message.filePath, message.content, message.colorizedLines);
             break;
     }
 });
@@ -156,8 +156,11 @@ window.selectMatchById = function(matchId) {
     }
 };
 
-function handleFileContent(filePath, content) {
-    fileContentsCache[filePath] = content;
+function handleFileContent(filePath, content, colorizedLines) {
+    fileContentsCache[filePath] = {
+        content: content,
+        colorizedLines: colorizedLines || null
+    };
 
     if (selectedMatchIndex >= 0 && allMatches[selectedMatchIndex].filePath === filePath) {
         displayFilePreview(filePath, allMatches[selectedMatchIndex].line);
@@ -177,23 +180,12 @@ function getLanguageFromExtension(filePath) {
 }
 
 function displayFilePreview(filePath, lineNumber) {
-    const content = fileContentsCache[filePath];
-    if (!content) return;
+    const cached = fileContentsCache[filePath];
+    if (!cached) return;
 
-    const language = getLanguageFromExtension(filePath);
-
-    const lines = content.split('\\n');
+    const lines = cached.content.split('\\n');
+    const colorizedLines = cached.colorizedLines;
     const totalLines = lines.length;
-
-    const MAX_LINES_TO_HIGHLIGHT = 500;
-    let startHighlight = 0;
-    let endHighlight = totalLines;
-
-    if (totalLines > MAX_LINES_TO_HIGHLIGHT) {
-        startHighlight = Math.max(0, lineNumber - Math.floor(MAX_LINES_TO_HIGHLIGHT / 2));
-        endHighlight = Math.min(totalLines, startHighlight + MAX_LINES_TO_HIGHLIGHT);
-        startHighlight = Math.max(0, endHighlight - MAX_LINES_TO_HIGHLIGHT);
-    }
 
     let lineNumbersHtml = '';
     let linesHtml = '';
@@ -202,30 +194,32 @@ function displayFilePreview(filePath, lineNumber) {
         const isMatchLine = (i + 1) === lineNumber;
         lineNumbersHtml += \`<div class="preview-line-number \${isMatchLine ? 'match-line' : ''}" id="line-num-\${i + 1}">\${i + 1}</div>\`;
 
-        let lineHtml;
-        if (i >= startHighlight && i < endHighlight) {
-            const line = lines[i];
-            if (hljs.getLanguage(language)) {
-                lineHtml = hljs.highlight(line, { language: language }).value;
-            } else {
-                lineHtml = hljs.highlightAuto(line).value;
-            }
+        let lineContent;
+        if (colorizedLines && colorizedLines[i]) {
+            // Use syntax-highlighted version from Shiki
+            lineContent = colorizedLines[i];
 
+            // Add search query highlighting on top of syntax highlighting
             if (isMatchLine) {
-                lineHtml = highlightMatchInLine(lineHtml, currentQuery);
+                lineContent = addSearchHighlightToColorizedLine(lineContent, lines[i], currentQuery);
             }
         } else {
-            lineHtml = lines[i].replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // Fallback to plain highlighting
+            if (isMatchLine) {
+                lineContent = highlightSearchQuery(lines[i], currentQuery);
+            } else {
+                lineContent = lines[i].replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
         }
 
-        linesHtml += \`<div class="code-line \${isMatchLine ? 'match-code-line' : ''}" id="code-line-\${i + 1}">\${lineHtml || '&nbsp;'}</div>\`;
+        linesHtml += \`<div class="code-line \${isMatchLine ? 'match-code-line' : ''}" id="code-line-\${i + 1}">\${lineContent || '&nbsp;'}</div>\`;
     }
 
     previewContent.innerHTML = \`
         <div class="preview-code-container">
             <div class="preview-line-numbers">\${lineNumbersHtml}</div>
             <div class="preview-code-block">
-                <pre><code class="hljs">\${linesHtml}</code></pre>
+                <pre><code>\${linesHtml}</code></pre>
             </div>
         </div>
     \`;
@@ -238,14 +232,80 @@ function displayFilePreview(filePath, lineNumber) {
     });
 }
 
-function highlightMatchInLine(lineHtml, query) {
-    if (!query) return lineHtml;
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = lineHtml;
-    const text = tempDiv.textContent || tempDiv.innerText;
+function highlightSearchQuery(text, query) {
+    if (!query) {
+        return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     const index = text.toLowerCase().indexOf(query.toLowerCase());
-    if (index === -1) return lineHtml;
-    return highlightText(lineHtml, query);
+    if (index === -1) {
+        return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    const before = text.substring(0, index).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const match = text.substring(index, index + query.length).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const after = text.substring(index + query.length).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    return \`\${before}<span class="match-highlight">\${match}</span>\${after}\`;
+}
+
+function addSearchHighlightToColorizedLine(colorizedHtml, plainText, query) {
+    if (!query) return colorizedHtml;
+
+    const index = plainText.toLowerCase().indexOf(query.toLowerCase());
+    if (index === -1) return colorizedHtml;
+
+    // Create a temporary div to work with the HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = colorizedHtml;
+
+    // Get the text content and find the position
+    const textContent = temp.textContent || '';
+    const matchIndex = textContent.toLowerCase().indexOf(query.toLowerCase());
+
+    if (matchIndex === -1) return colorizedHtml;
+
+    // Walk through the nodes and wrap the matching text
+    let currentPos = 0;
+    const matchEnd = matchIndex + query.length;
+
+    function wrapTextNodes(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const nodeText = node.textContent || '';
+            const nodeStart = currentPos;
+            const nodeEnd = currentPos + nodeText.length;
+
+            // Check if this text node contains part of the match
+            if (nodeEnd > matchIndex && nodeStart < matchEnd) {
+                const matchStartInNode = Math.max(0, matchIndex - nodeStart);
+                const matchEndInNode = Math.min(nodeText.length, matchEnd - nodeStart);
+
+                const before = nodeText.substring(0, matchStartInNode);
+                const match = nodeText.substring(matchStartInNode, matchEndInNode);
+                const after = nodeText.substring(matchEndInNode);
+
+                const span = document.createElement('span');
+                span.className = 'match-highlight';
+                span.textContent = match;
+
+                const fragment = document.createDocumentFragment();
+                if (before) fragment.appendChild(document.createTextNode(before));
+                fragment.appendChild(span);
+                if (after) fragment.appendChild(document.createTextNode(after));
+
+                node.parentNode.replaceChild(fragment, node);
+            }
+
+            currentPos += nodeText.length;
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Process child nodes
+            const children = Array.from(node.childNodes);
+            children.forEach(child => wrapTextNodes(child));
+        }
+    }
+
+    wrapTextNodes(temp);
+    return temp.innerHTML;
 }
 
 document.addEventListener('keydown', (e) => {

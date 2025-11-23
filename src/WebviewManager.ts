@@ -2,17 +2,20 @@ import * as vscode from 'vscode';
 import { WebviewMessage } from './types';
 import { SearchService } from './services/SearchService';
 import { FileService } from './services/FileService';
+import { SyntaxHighlightService } from './services/SyntaxHighlightService';
 import { getWebviewContent } from './webview/webviewContent';
 
 export class WebviewManager {
     private panel: vscode.WebviewPanel | undefined;
     private searchService: SearchService;
     private fileService: FileService;
+    private syntaxHighlightService: SyntaxHighlightService;
     private disposables: vscode.Disposable[] = [];
 
     constructor(private context: vscode.ExtensionContext) {
         this.searchService = new SearchService();
         this.fileService = new FileService();
+        this.syntaxHighlightService = new SyntaxHighlightService();
     }
 
     show(): void {
@@ -27,6 +30,7 @@ export class WebviewManager {
     dispose(): void {
         this.panel?.dispose();
         this.disposables.forEach(d => d.dispose());
+        this.syntaxHighlightService.dispose();
     }
 
     private createPanel(): void {
@@ -111,11 +115,14 @@ export class WebviewManager {
 
         try {
             const content = await this.fileService.getFileContent(filePath);
+            const lines = content.split('\n');
+            const colorizedLines = await this.syntaxHighlightService.highlightLines(lines, filePath);
 
             this.panel.webview.postMessage({
                 command: 'fileContent',
                 filePath,
-                content
+                content,
+                colorizedLines
             });
         } catch (error) {
             console.error('Error reading file:', error);
