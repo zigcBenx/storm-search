@@ -59,7 +59,11 @@ export class WebviewManager {
 
         this.panels.set(panelId, panel);
 
-        panel.webview.html = getWebviewContent();
+        // Get word wrap setting
+        const editorConfig = vscode.workspace.getConfiguration('editor');
+        const wordWrap = editorConfig.get<string>('wordWrap', 'off');
+
+        panel.webview.html = getWebviewContent(wordWrap);
         this.setupMessageHandler(panelId, panel);
         this.setupPanelDisposal(panelId, panel);
     }

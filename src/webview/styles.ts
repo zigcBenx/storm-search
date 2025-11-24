@@ -1,4 +1,7 @@
-export function getStyles(): string {
+export function getStyles(wordWrap: string = 'off'): string {
+    // Convert VS Code word wrap setting to CSS white-space value
+    const whiteSpace = wordWrap === 'off' ? 'pre' : 'pre-wrap';
+    const overflowX = wordWrap === 'off' ? 'auto' : 'hidden';
     return `<style>
         * {
             margin: 0;
@@ -175,12 +178,14 @@ export function getStyles(): string {
             font-size: 13px;
             line-height: 1.6;
             border-right: 1px solid var(--vscode-panel-border);
+            flex-shrink: 0;
+            align-self: flex-start;
         }
 
         .preview-code-block {
             flex: 1;
             padding: 0 16px;
-            overflow-x: auto;
+            overflow-x: ${overflowX};
         }
 
         .preview-code-block pre {
@@ -188,6 +193,7 @@ export function getStyles(): string {
             padding: 0;
             background: transparent !important;
             font-size: 13px;
+            white-space: inherit;
         }
 
         .preview-code-block code {
@@ -196,11 +202,12 @@ export function getStyles(): string {
             line-height: 1.6;
             background: transparent !important;
             display: block;
+            white-space: inherit;
         }
 
         .preview-line-number {
             display: block;
-            padding: 2px 0;
+            line-height: 1.6;
         }
 
         .preview-line-number.match-line {
@@ -209,8 +216,15 @@ export function getStyles(): string {
         }
 
         .code-line {
-            white-space: pre;
-            min-height: 20px;
+            white-space: ${whiteSpace};
+            word-break: normal;
+            overflow-wrap: anywhere;
+            display: block;
+            line-height: 1.6;
+        }
+
+        .code-line * {
+            white-space: inherit;
         }
 
         .code-line.match-code-line {
