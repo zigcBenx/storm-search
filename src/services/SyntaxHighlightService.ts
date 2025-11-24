@@ -1,13 +1,89 @@
 import * as vscode from 'vscode';
-import { createHighlighter, Highlighter, BundledLanguage, BundledTheme } from 'shiki';
+import { createHighlighter, Highlighter, BundledLanguage } from 'shiki';
+import path from 'path';
+
+
+export type TokenColor = {
+    scope: string[];
+    settings: any
+}
+
+// Lifted and adapted from: https://github.com/microsoft/vscode/issues/32813#issuecomment-524174937
+export function getThemeSettings(themeName: string | undefined): TokenColor[] {
+    if (!themeName) {
+        return [];
+    }
+
+    const tokenColors = new Map();
+
+    // Resolves theme folder path at runtime
+    let currentThemePath;
+    for (const extension of vscode.extensions.all) {
+        // extension.packageJSON.contributes.themes is resolveable even if the extension doesn't actually contribute any themes
+        const themes = extension.packageJSON.contributes && extension.packageJSON.contributes.themes;
+        const currentTheme = themes && themes.find((theme: any) => theme.label === themeName);
+        if (currentTheme) {
+            currentThemePath = path.join(extension.extensionPath, currentTheme.path);
+            break;
+        }
+    }
+
+    // Resolve all included themes, add nested theme paths if necessary
+    const themePaths = [];
+    if (currentThemePath) { themePaths.push(currentThemePath); }
+
+    while (themePaths.length > 0) {
+        const themePath = themePaths.pop();
+        if (!themePath) throw new Error("this is to make typescript happy");
+        const theme: any = require(themePath);
+        if (theme) {
+            if (theme.include) {
+                themePaths.push(path.join(path.dirname(themePath), theme.include));
+            }
+            if (theme.tokenColors) {
+                theme.tokenColors.forEach((rule: any) => {
+                    if (typeof rule.scope === "string" && !tokenColors.has(rule.scope)) {
+                        tokenColors.set(rule.scope, rule.settings);
+                    } else if (rule.scope instanceof Array) {
+                        rule.scope.forEach((scope: any) => {
+                            if (!tokenColors.has(rule.scope)) {
+                                tokenColors.set(scope, rule.settings);
+                            }
+                        });
+                    }
+                });
+            }
+        }
+    }
+
+    // Convert back to settings array, digestible by shiki
+    const finalSettings: TokenColor[] = []
+    for (const [scope, settings] of tokenColors) {
+        // Circumvent circular issue
+        const safeSettings = { ...settings };
+        finalSettings.push({ scope: [scope], settings: safeSettings });
+    }
+
+    return finalSettings
+}
+
 
 export class SyntaxHighlightService {
     private highlighter: Highlighter | undefined;
-    private currentTheme: BundledTheme = 'dark-plus';
+    private currentTheme: { name: string; settings?: TokenColor[] } = { name: 'dark-plus' };
 
     async initialize(): Promise<void> {
         const currentThemeName = vscode.workspace.getConfiguration('workbench').get<string>('colorTheme');
-        this.currentTheme = this.mapVSCodeThemeToShiki(currentThemeName);
+
+        if (currentThemeName) {
+            const themeSettings = getThemeSettings(currentThemeName);
+            if (themeSettings.length > 0) {
+                this.currentTheme = {
+                    name: "custom-theme",
+                    settings: themeSettings
+                }
+            }
+        }
 
         this.highlighter = await createHighlighter({
             themes: [this.currentTheme],
@@ -29,7 +105,7 @@ export class SyntaxHighlightService {
         try {
             const html = this.highlighter!.codeToHtml(code, {
                 lang: language,
-                theme: this.currentTheme
+                theme: this.currentTheme.name
             });
 
             // Extract just the code part without the pre/code wrapper
@@ -53,7 +129,7 @@ export class SyntaxHighlightService {
             try {
                 const html = this.highlighter!.codeToHtml(line || ' ', {
                     lang: language,
-                    theme: this.currentTheme
+                    theme: this.currentTheme.name
                 });
 
                 // Extract just the line content
@@ -100,30 +176,6 @@ export class SyntaxHighlightService {
         };
 
         return langMap[ext] || 'typescript';
-    }
-
-    private mapVSCodeThemeToShiki(themeName?: string): BundledTheme {
-        if (!themeName) {
-            return 'dark-plus';
-        }
-
-        const themeNameLower = themeName.toLowerCase();
-
-        // Map common VS Code themes to Shiki themes
-        if (themeNameLower.includes('light')) {
-            return 'light-plus';
-        } else if (themeNameLower.includes('dark')) {
-            return 'dark-plus';
-        } else if (themeNameLower.includes('monokai')) {
-            return 'monokai';
-        } else if (themeNameLower.includes('solarized') && themeNameLower.includes('light')) {
-            return 'solarized-light';
-        } else if (themeNameLower.includes('solarized') && themeNameLower.includes('dark')) {
-            return 'solarized-dark';
-        }
-
-        // Default to dark-plus
-        return 'dark-plus';
     }
 
     private escapeHtml(text: string): string {
