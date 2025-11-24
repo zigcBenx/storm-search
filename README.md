@@ -1,5 +1,7 @@
 # Storm Search
 
+[![OpenPledge](https://raw.githubusercontent.com/zigcBenx/weather-app/ff8ab3b35353253e3c65d2bd9f926fcf229f92c1/ablblbl(4).svg)](https://app.openpledge.io/repositories/zigcBenx/storm-search)
+
 > PhpStorm-inspired global search for VS Code with split-panel preview and syntax highlighting
 
 [Install on the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Benxlabs.storm-search)
@@ -31,6 +33,12 @@ Inspired by PhpStorm's search experience, this extension provides a dual-panel v
 
 ![File Preview with Highlighting](images/screenshot-preview.png)
 
+## Installation
+
+![How to Install](images/how-to-install.gif)
+
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Benxlabs.storm-search) or search for "Storm Search" in the VS Code extensions panel.
+
 ## Usage
 
 1. Press `Ctrl+Shift+F` (Windows/Linux) or `Cmd+Shift+F` (Mac)
@@ -40,3 +48,8 @@ Inspired by PhpStorm's search experience, this extension provides a dual-panel v
 5. Press `Esc` to close
 
 The search automatically ignores common build folders like `node_modules`, `.next`, `dist`, etc.
+
+
+## Support
+
+*Support this project by pledging to issues on [OpenPledge](https://app.openpledge.io/repositories/zigcBenx/storm-search) - fund features and bug fixes you care about*
