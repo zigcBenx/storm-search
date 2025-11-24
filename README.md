@@ -1,11 +1,10 @@
-<div style="position: relative;">
-  <h1>Storm Search</h1>
-  <a href="https://app.openpledge.io/repositories/zigcBenx/storm-search" style="position: absolute; top: 0; right: 0;"><img src="https://raw.githubusercontent.com/zigcBenx/weather-app/ff8ab3b35353253e3c65d2bd9f926fcf229f92c1/ablblbl(4).svg" alt="OpenPledge"></a>
-</div>
+# Storm Search
 
 > PhpStorm-inspired global search for VS Code with split-panel preview and syntax highlighting
 
 [Install on the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Benxlabs.storm-search)
+
+[![OpenPledge](https://raw.githubusercontent.com/zigcBenx/weather-app/ff8ab3b35353253e3c65d2bd9f926fcf229f92c1/ablblbl(4).svg)](https://openpledge.io)
 
 ![Demo](images/demo.gif)
 
