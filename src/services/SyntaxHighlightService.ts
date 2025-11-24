@@ -45,7 +45,6 @@ export function getTheme(themeName: string | undefined): Theme | null {
         if (!themePath) throw new Error("this is to make typescript happy");
         const theme: any = require(themePath);
         if (theme) {
-            console.log(theme)
             if (theme.include) {
                 themePaths.push(path.join(path.dirname(themePath), theme.include));
             }
