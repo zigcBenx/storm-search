@@ -275,7 +275,7 @@ function displayFilePreview(filePath, lineNumber) {
 
     previewContent.innerHTML = \`
         <div class="preview-code-container">
-            <div class="preview-line-numbers">\${lineNumbersHtml}</div>
+            <div class="preview-line-numbers" id="previewLineNumbers">\${lineNumbersHtml}</div>
             <div class="preview-code-block">
                 <pre><code>\${linesHtml}</code></pre>
             </div>
@@ -287,7 +287,37 @@ function displayFilePreview(filePath, lineNumber) {
         if (matchLineElement) {
             matchLineElement.scrollIntoView({ behavior: 'instant', block: 'center' });
         }
+
+        // Adjust line numbers to account for wrapped lines
+        adjustLineNumbersForWrapping(totalLines);
     });
+}
+
+function adjustLineNumbersForWrapping(totalLines) {
+    const lineNumbersContainer = document.getElementById('previewLineNumbers');
+    if (!lineNumbersContainer) return;
+
+    for (let i = 1; i <= totalLines; i++) {
+        const lineNumElement = document.getElementById('line-num-' + i);
+        const codeLineElement = document.getElementById('code-line-' + i);
+
+        if (!lineNumElement || !codeLineElement) continue;
+
+        const codeLineHeight = codeLineElement.offsetHeight;
+        const singleLineHeight = parseFloat(getComputedStyle(codeLineElement).lineHeight);
+
+        // If the code line wraps (height is more than one line)
+        if (codeLineHeight > singleLineHeight * 1.2) {
+            lineNumElement.style.height = codeLineHeight + 'px';
+            lineNumElement.style.display = 'flex';
+            lineNumElement.style.alignItems = 'flex-start';
+            lineNumElement.style.justifyContent = 'flex-end';
+
+            // Keep the line number at the top
+            const lineNumText = lineNumElement.textContent;
+            lineNumElement.textContent = lineNumText;
+        }
+    }
 }
 
 function highlightSearchQuery(text, query) {

@@ -1,7 +1,7 @@
 import { getStyles } from './styles';
 import { getClientScript } from './script';
 
-export function getWebviewContent(): string {
+export function getWebviewContent(wordWrap: string = 'off'): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +10,7 @@ export function getWebviewContent(): string {
     <title>Search</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    ${getStyles()}
+    ${getStyles(wordWrap)}
 </head>
 <body>
     <div class="search-header">
