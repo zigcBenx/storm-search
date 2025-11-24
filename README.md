@@ -1,7 +1,9 @@
-<div style="display: flex; justify-content: space-between; align-items: center;">
-  <p style="font-size:20px;margin: 0;">Storm Search</p>
-  <a href="https://app.openpledge.io/repositories/zigcBenx/storm-search"><img src="https://raw.githubusercontent.com/zigcBenx/weather-app/ff8ab3b35353253e3c65d2bd9f926fcf229f92c1/ablblbl(4).svg" alt="OpenPledge"></a>
-</div>
+<table width="100%" style="border: none;">
+  <tr>
+    <td style="border: none;"><h1 style="margin: 0;">Storm Search</h1></td>
+    <td align="right" style="border: none;"><a href="https://app.openpledge.io/repositories/zigcBenx/storm-search"><img src="https://raw.githubusercontent.com/zigcBenx/weather-app/ff8ab3b35353253e3c65d2bd9f926fcf229f92c1/ablblbl(4).svg" alt="OpenPledge"></a></td>
+  </tr>
+</table>
 
 > PhpStorm-inspired global search for VS Code with split-panel preview and syntax highlighting
 
