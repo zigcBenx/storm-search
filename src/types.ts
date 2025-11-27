@@ -13,12 +13,19 @@ export interface FileSearchResult {
     matches: SearchMatch[];
 }
 
-export interface WebviewMessage {
-    command: 'search' | 'getFileContent' | 'openFile' | 'close';
-    text?: string;
-    filePath?: string;
-    line?: number;
-    column?: number;
+export type WebviewMessage = {
+    command: 'search'
+    text: string;
+} | {
+    command: 'getFileContent'
+    filePath: string;
+} | {
+    command: 'openFile'
+    filePath: string;
+    line: number;
+    column: number;
+} | {
+    command: 'close';
 }
 
 export interface SearchOptions {

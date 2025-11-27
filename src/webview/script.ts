@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { FileSearchResult, SearchMatch } from "../types";
+import { FileSearchResult, SearchMatch, WebviewMessage } from "../types";
 
 
 type SearchMatchWithId = SearchMatch & { matchId: number };
@@ -9,6 +9,10 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
 (function () {
     // @ts-ignore
     const vscode = acquireVsCodeApi();
+
+    const postMessage = (message: WebviewMessage) => {
+        vscode.postMessage(message);
+    };
 
     const searchInput = document.getElementById('searchInput')!;
     const resultsHeader = document.getElementById('resultsHeader')!;
@@ -65,7 +69,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
         // Ensure a longer delay for short queries as they are more likely to change
         const timeoutDelay = searchText.length < 3 ? 500 : 75;
         searchTimeout = setTimeout(() => {
-            vscode.postMessage({ command: 'search', text: searchText });
+            postMessage({ command: 'search', text: searchText });
         }, timeoutDelay);
     });
 
@@ -295,7 +299,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
         previewHeader.textContent = match.relativePath;
 
         if (!fileContentsCache[match.filePath]) {
-            vscode.postMessage({
+            postMessage({
                 command: 'getFileContent',
                 filePath: match.filePath
             });
@@ -500,7 +504,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
             e.preventDefault();
             if (selectedMatchIndex >= 0) {
                 const match = allMatches[selectedMatchIndex];
-                vscode.postMessage({
+                postMessage({
                     command: 'openFile',
                     filePath: match.filePath,
                     line: match.line,
@@ -508,7 +512,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
                 });
             }
         } else if (e.key === 'Escape') {
-            vscode.postMessage({ command: 'close' });
+            postMessage({ command: 'close' });
         }
     });
 
