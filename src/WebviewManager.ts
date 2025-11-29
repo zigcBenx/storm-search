@@ -4,6 +4,7 @@ import { SearchService } from './services/SearchService';
 import { FileService } from './services/FileService';
 import { SyntaxHighlightService } from './services/SyntaxHighlightService';
 import { getWebviewContent } from './webview/webviewContent';
+import { IconThemeService } from './services/IconThemeService';
 
 export class WebviewManager {
     private panels: Map<string, vscode.WebviewPanel> = new Map();
@@ -11,6 +12,7 @@ export class WebviewManager {
 
     private searchService: SearchService;
     private fileService: FileService;
+    private iconThemeService: IconThemeService;
     private syntaxHighlightService: SyntaxHighlightService;
     private disposables: vscode.Disposable[] = [];
     private panelCounter: number = 0;
@@ -19,6 +21,7 @@ export class WebviewManager {
         this.searchService = new SearchService();
         this.fileService = new FileService();
         this.syntaxHighlightService = new SyntaxHighlightService();
+        this.iconThemeService = new IconThemeService();
 
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
             this.clearCache(e.document.uri.toString());
@@ -55,6 +58,16 @@ export class WebviewManager {
         const panelId = `search-${this.panelCounter}`;
         const tabNumber = this.panels.size + 1;
 
+        const localResourceRoots = [
+            vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+            vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview')
+        ]
+
+        const iconThemeExtension = this.iconThemeService.getIconThemeExtension();
+        if (iconThemeExtension) {
+            localResourceRoots.push(iconThemeExtension.extensionUri);
+        }
+
         const panel = vscode.window.createWebviewPanel(
             'customSearch',
             `Search ${tabNumber}`,
@@ -62,10 +75,7 @@ export class WebviewManager {
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-                    vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview')
-                ]
+                localResourceRoots
             }
         );
 
@@ -78,10 +88,17 @@ export class WebviewManager {
         const scriptUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview', 'script.js'));
         const styleUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'styles.css'));
 
+        const iconFonts = this.iconThemeService.getIconFonts();
+
+        console.log('Icon Fonts:', iconFonts);
         panel.webview.html = getWebviewContent({
             scriptUri,
             styleUri,
             wordWrap,
+            fonts: iconFonts.map((font) => ({
+                ...font,
+                fontUri: panel.webview.asWebviewUri(font.fontUri)
+            }))
         });
         this.setupMessageHandler(panelId, panel);
         this.setupPanelDisposal(panelId, panel);
@@ -147,7 +164,17 @@ export class WebviewManager {
                 resultCount += results.length;
                 panel.webview.postMessage({
                     command: i === 0 ? 'newSearchResults' : 'extendSearchResults',
-                    results
+                    results: results.map((result) => {
+                        const icon = this.iconThemeService.getIconForPath(result.filePath);
+                        if (icon?.svgPath) {
+                            icon.svgPath = panel.webview.asWebviewUri(vscode.Uri.file(icon.svgPath)).toString();
+                        }
+
+                        return {
+                            ...result,
+                            icon
+                        }
+                    })
                 });
             }
 

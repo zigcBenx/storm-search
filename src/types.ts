@@ -1,3 +1,5 @@
+import { type Uri } from 'vscode';
+
 export interface SearchMatch {
     filePath: string;
     relativePath: string;
@@ -7,10 +9,31 @@ export interface SearchMatch {
     preview: string;
 }
 
+export interface Font {
+    fontId: string;
+    fontFormat: string;
+    fontUri: Uri;
+    fontWeight?: string;
+    fontStyle?: string;
+    fontSize?: string;
+}
+
+export type ResolvedIconDefinition = {
+    fontCharacter?: never
+    svgPath: string;
+} | {
+    svgPath?: never;
+    fontCharacter: string;
+    fontColor?: string;
+    fontSize?: string;
+    fontId?: string;
+};
+
 export interface FileSearchResult {
     filePath: string;
     relativePath: string;
     matches: SearchMatch[];
+    icon?: ResolvedIconDefinition;
 }
 
 export type WebviewMessage = {

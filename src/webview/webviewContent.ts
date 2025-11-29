@@ -1,12 +1,33 @@
 import { Uri } from 'vscode';
 import { getNonce } from '../util';
+import { Font } from '../types';
 
 type WebviewContentOptions = {
     scriptUri: Uri,
     styleUri: Uri,
     wordWrap?: string;
+    fonts?: Font[];
 }
 
+function generateFontFaceStyles(fonts?: Font[]): string {
+    if (!fonts || fonts.length === 0) {
+        return '';
+    }
+
+    return fonts.map((font) => `
+        @font-face {
+            font-family: '${font.fontId}';
+            src: url('${font.fontUri}') format('${font.fontFormat}');
+            font-weight: ${font.fontWeight || 'normal'};
+            font-style: ${font.fontStyle || 'normal'};
+            font-size: ${font.fontSize || '16px'};
+        }
+
+        .icon-font-${font.fontId} {
+            font-family: '${font.fontId}';
+        }
+    `).join('\n');
+}
 
 export function getWebviewContent(options: WebviewContentOptions): string {
     return `<!DOCTYPE html>
@@ -15,6 +36,11 @@ export function getWebviewContent(options: WebviewContentOptions): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search</title>
+
+    <style>
+        ${generateFontFaceStyles(options.fonts)}
+    </style>
+
     <link rel="stylesheet" href="${options.styleUri}">
 </head>
 <body class="${options.wordWrap === 'off' ? '' : 'wrap-lines'}">

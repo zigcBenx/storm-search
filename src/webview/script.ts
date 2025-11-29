@@ -3,7 +3,7 @@
 import { FileSearchResult, SearchMatch, WebviewMessage } from "../types";
 
 
-type SearchMatchWithId = SearchMatch & { matchId: number };
+type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResult['icon'] };
 
 // Script run within the webview itself.
 (function () {
@@ -103,17 +103,17 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
         allMatches = [];
         allFiles = new Set();
 
-        results.forEach(file => {
-            allFiles.add(file.filePath);
-            file.matches.forEach(match => {
+        results.forEach((result) => {
+            result.matches.forEach((match) => {
                 allMatches.push({
                     matchId: allMatches.length,
-                    filePath: file.filePath,
-                    relativePath: file.relativePath,
+                    filePath: result.filePath,
+                    relativePath: result.relativePath,
                     line: match.line,
                     column: match.column,
                     preview: match.preview,
                     previewColumn: match.previewColumn,
+                    icon: result.icon
                 });
             });
         });
@@ -127,17 +127,18 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
 
     function handleExtendSearchResults(results: FileSearchResult[]) {
         const newMatches: SearchMatchWithId[] = [];
-        results.forEach(file => {
-            allFiles.add(file.filePath);
-            file.matches.forEach(match => {
+        results.forEach((result) => {
+            allFiles.add(result.filePath);
+            result.matches.forEach((match) => {
                 newMatches.push({
                     matchId: allMatches.length,
-                    filePath: file.filePath,
-                    relativePath: file.relativePath,
+                    filePath: result.filePath,
+                    relativePath: result.relativePath,
                     line: match.line,
                     column: match.column,
                     preview: match.preview,
                     previewColumn: match.previewColumn,
+                    icon: result.icon
                 });
             });
         });
@@ -150,61 +151,6 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
         resultsList.innerHTML = '<div class="empty-state">No results found</div>';
         resultsHeader.textContent = '0 results';
         previewContent.innerHTML = '<div class="empty-state">No results</div>';
-    }
-
-
-    function getFileIcon(fileName: string): string {
-        const ext = fileName.split('.').pop()?.toLowerCase() || '';
-        const name = fileName.toLowerCase();
-
-        // Icon configuration with colors and labels
-        const iconMap: Record<string, { label: string, color: string }> = {
-            // Special files
-            'package.json': { label: 'PKG', color: '#e8274b' },
-            'tsconfig.json': { label: 'TS', color: '#519aba' },
-            '.gitignore': { label: 'GIT', color: '#41535b' },
-            'dockerfile': { label: 'DOK', color: '#519aba' },
-            'readme.md': { label: 'MD', color: '#519aba' },
-
-            // Extensions
-            'ts': { label: 'TS', color: '#519aba' },
-            'tsx': { label: 'TSX', color: '#519aba' },
-            'js': { label: 'JS', color: '#cbcb41' },
-            'jsx': { label: 'JSX', color: '#61dafb' },
-            'json': { label: 'JSON', color: '#cbcb41' },
-            'md': { label: 'MD', color: '#519aba' },
-            'py': { label: 'PY', color: '#3776ab' },
-            'java': { label: 'JAVA', color: '#cc3e44' },
-            'css': { label: 'CSS', color: '#519aba' },
-            'scss': { label: 'SCSS', color: '#f55385' },
-            'html': { label: 'HTML', color: '#e37933' },
-            'xml': { label: 'XML', color: '#e37933' },
-            'sql': { label: 'SQL', color: '#f55385' },
-            'sh': { label: 'SH', color: '#4d5a5e' },
-            'yaml': { label: 'YML', color: '#cbcb41' },
-            'yml': { label: 'YML', color: '#cbcb41' },
-            'txt': { label: 'TXT', color: '#858585' },
-            'log': { label: 'LOG', color: '#858585' },
-            'php': { label: 'PHP', color: '#a074c4' },
-            'rb': { label: 'RB', color: '#cc3e44' },
-            'go': { label: 'GO', color: '#519aba' },
-            'rs': { label: 'RS', color: '#e37933' },
-            'c': { label: 'C', color: '#519aba' },
-            'cpp': { label: 'CPP', color: '#519aba' },
-            'h': { label: 'H', color: '#a074c4' },
-            'vue': { label: 'VUE', color: '#42b883' },
-            'svelte': { label: 'SVL', color: '#ff3e00' }
-        };
-
-        const icon = iconMap[name] || iconMap[ext] || { label: 'FILE', color: '#858585' };
-
-        // Create SVG icon
-        const svg = `<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="${icon.color}" stroke-width="1"/>
-        <text x="8" y="11.5" font-family="Arial, sans-serif" font-size="6" font-weight="bold" text-anchor="middle" fill="${icon.color}">${icon.label}</text>
-    </svg>`;
-
-        return 'data:image/svg+xml;base64,' + btoa(svg);
     }
 
     function renderMatches(upTo: number, append: boolean = false) {
@@ -223,7 +169,6 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
             const match = allMatches[currentlyRenderedCount + i];
 
             const fileName = match.relativePath.split('/').pop() || match.relativePath;
-            const iconSrc = getFileIcon(fileName);
             const isNewFile = match.relativePath !== currentFile;
 
             if (isNewFile) {
@@ -240,7 +185,20 @@ type SearchMatchWithId = SearchMatch & { matchId: number };
                 currentFile = match.relativePath;
                 html += `<div class="file-group">
                 <div class="file-header" title="${escapeHtml(match.relativePath)}">
-                    <img src="${iconSrc}" class="file-icon" alt="">
+                `
+
+                if (match.icon) {
+                    if (match.icon.svgPath) {
+                        html += `<img src="${match.icon.svgPath}" class="file-icon" alt="">`
+                    } else if (match.icon.fontCharacter) {
+                        const fontChar = String.fromCharCode(parseInt(match.icon.fontCharacter.substring(1), 16))
+
+                        html += `<div class="file-icon icon-font-${match.icon.fontId}" style="color: ${match.icon.fontColor};">${fontChar}</div>`
+                    }
+                } else {
+                    html += `<img src="" class="file-icon" alt="">`
+                }
+                html += `
                     <span class="file-name">${escapeHtml(fileName)}</span>
                 </div>`;
             }

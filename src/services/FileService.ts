@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+
 export class FileService {
     async getFileContent(filePath: string): Promise<string> {
         const uri = vscode.Uri.file(filePath);
