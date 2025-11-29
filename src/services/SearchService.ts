@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { FileSearchResult, SearchMatch, SearchOptions } from '../types';
 import { EXCLUDE_PATTERNS, BINARY_EXTENSIONS, DEFAULT_SEARCH_OPTIONS } from '../constants';
 import { escapeRegExp } from '../util';
+import path from 'path';
 
 export class SearchService {
     private options: SearchOptions;
@@ -30,6 +31,32 @@ export class SearchService {
         clearTimeout(timer);
         cancellationTokenSource.dispose();
 
+        const collator = new Intl.Collator('en', { sensitivity: 'base' });
+        files.sort((a, b) => {
+            const pathA = a.path.split('/');
+            const pathB = b.path.split('/');
+
+            // Compare each path segment level by level
+            const minLength = Math.min(pathA.length, pathB.length);
+            for (let i = 0; i < minLength; i++) {
+                const isLastA = i === pathA.length - 1;
+                const isLastB = i === pathB.length - 1;
+
+                // If one is a file and one is a folder at this level, folder comes first
+                if (isLastA !== isLastB) {
+                    return isLastA ? 1 : -1; // folder (not last) comes before file (last)
+                }
+
+                // Otherwise compare the segments alphabetically
+                const comparison = collator.compare(pathA[i], pathB[i]);
+                if (comparison !== 0) {
+                    return comparison;
+                }
+            }
+
+            // If all segments match, shorter path (folder) comes first
+            return pathA.length - pathB.length;
+        });
         return files;
     }
 
