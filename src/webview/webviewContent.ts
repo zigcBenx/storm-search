@@ -62,8 +62,7 @@ export function getWebviewContent(options: WebviewContentOptions): string {
                     type="text"
                     class="scope-path-input"
                     id="scopePathInput"
-                    placeholder="Enter directory path..."
-                    readonly
+                    placeholder="path/to/dir or path1/**,path2/** (comma-separated)"
                 />
                 <button class="scope-browse-button" id="scopeBrowseButton" title="Browse...">...</button>
             </div>

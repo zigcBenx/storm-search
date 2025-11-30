@@ -80,7 +80,13 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         // If directory scope is selected and a path is set, use it as include pattern
         let includePattern: string | undefined = undefined;
         if (currentScope === 'directory' && scopePath) {
-            includePattern = scopePath + '/**/*';
+            // Handle comma-separated paths
+            const paths = scopePath.split(',').map(p => p.trim()).filter(p => p);
+            includePattern = paths.map(path => {
+                // If path already contains glob patterns (* or **), use it as-is
+                // Otherwise, append /**/* to search everything under the directory
+                return path.includes('*') ? path : path + '/**/*';
+            }).join(',');
         }
 
         currentQuery = searchText;
@@ -129,6 +135,12 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
     scopeBrowseButton.addEventListener('click', () => {
         postMessage({ command: 'pickDirectory' });
+    });
+
+    // Update scopePath and perform search when user manually edits the path input
+    scopePathInput.addEventListener('input', () => {
+        scopePath = scopePathInput.value.trim();
+        performSearch();
     });
 
     let scrollDebounce: any = null;
