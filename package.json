@@ -2,7 +2,7 @@
   "name": "storm-search",
   "displayName": "Storm Search",
   "description": "⚡ Lightning-fast PhpStorm-style global search with split-panel preview and syntax highlighting. Search your entire codebase instantly!",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "Benxlabs",
   "author": {
     "name": "Ziga"

@@ -69,6 +69,21 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         }
     });
 
+    /**
+     * Converts directory paths to glob patterns for file filtering.
+     * Supports comma-separated paths and preserves existing glob patterns.
+     * Examples: "src/components" becomes "src/components/**\/*"
+     *           "src,tests" becomes "src/**\/*,tests/**\/*"
+     */
+    function convertPathsToGlobPatterns(scopePath: string): string {
+        const paths = scopePath.split(',').map(p => p.trim()).filter(p => p);
+        return paths.map(path => {
+            // If path already contains glob patterns (* or **), use it as-is
+            // Otherwise, append /**/* to search everything under the directory
+            return path.includes('*') ? path : path + '/**/*';
+        }).join(',');
+    }
+
     function performSearch() {
         const searchText = (searchInput as HTMLInputElement).value.trim();
 
@@ -77,22 +92,16 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             return;
         }
 
-        // If directory scope is selected and a path is set, use it as include pattern
+        // Build include pattern based on current scope
         let includePattern: string | undefined = undefined;
         if (currentScope === 'directory' && scopePath) {
-            // Handle comma-separated paths
-            const paths = scopePath.split(',').map(p => p.trim()).filter(p => p);
-            includePattern = paths.map(path => {
-                // If path already contains glob patterns (* or **), use it as-is
-                // Otherwise, append /**/* to search everything under the directory
-                return path.includes('*') ? path : path + '/**/*';
-            }).join(',');
+            includePattern = convertPathsToGlobPatterns(scopePath);
         }
 
         currentQuery = searchText;
         clearTimeout(searchTimeout);
 
-        // Ensure a longer delay for short queries as they are more likely to change
+        // Use longer delay for short queries as they are more likely to change
         const timeoutDelay = searchText.length < 3 ? 500 : 75;
         searchTimeout = setTimeout(() => {
             postMessage({
