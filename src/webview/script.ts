@@ -346,7 +346,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 </div>`;
             }
             const highlighted = highlightText(match.preview, currentQuery, match.previewColumn);
-            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId})">
+            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId}, event)">
                 <span class="match-line-number">[${match.line}]</span>
                 <span class="match-text">${highlighted}</span>
             </div>`;
@@ -412,20 +412,46 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     // @ts-ignore
     window.selectMatchById = selectMatchById;
 
-    function openMatchById(matchId: number) {
+    function openMatchById(matchId: number, event?: MouseEvent) {
         if (matchId < 0 || matchId >= allMatches.length) return;
 
         const match = allMatches[matchId];
+        let openMode: 'normal' | 'newTab' | 'splitView' = 'normal';
+
+        if (event) {
+            if (event.ctrlKey || event.metaKey) {
+                // Ctrl+Click or Cmd+Click: Open in new tab, keep search open
+                openMode = 'newTab';
+            } else if (event.shiftKey) {
+                // Shift+Click: Open in split view, keep search open
+                openMode = 'splitView';
+            }
+        }
+
         postMessage({
             command: 'openFile',
             filePath: match.filePath,
             line: match.line,
-            column: match.column
+            column: match.column,
+            openMode: openMode
         });
     }
     // Make available globally for ondblclick handlers
     // @ts-ignore
     window.openMatchById = openMatchById;
+
+    function openMatchWithMode(mode: 'normal' | 'newTab' | 'splitView') {
+        if (selectedMatchIndex < 0 || selectedMatchIndex >= allMatches.length) return;
+
+        const match = allMatches[selectedMatchIndex];
+        postMessage({
+            command: 'openFile',
+            filePath: match.filePath,
+            line: match.line,
+            column: match.column,
+            openMode: mode
+        });
+    }
 
     function handleFileContent(filePath: string, content: string, colorizedLines: string[] | null) {
         fileContentsCache[filePath] = {
@@ -637,29 +663,40 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     }
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowDown') {
+        // Check if we're in the file mask or scope path input (not search input)
+        const isInOtherInput = document.activeElement === fileMaskInput ||
+                               document.activeElement === scopePathInput;
+
+        // Arrow key navigation - works even when in search input
+        if (e.key === 'ArrowDown' && !isInOtherInput) {
             e.preventDefault();
             if (selectedMatchIndex < allMatches.length - 1) {
                 selectMatchById(selectedMatchIndex + 1);
             }
-        } else if (e.key === 'ArrowUp') {
+        } else if (e.key === 'ArrowUp' && !isInOtherInput) {
             e.preventDefault();
             if (selectedMatchIndex > 0) {
                 selectMatchById(selectedMatchIndex - 1);
             }
-        } else if (e.key === 'Enter') {
+        } else if (e.key === 'Enter' && !isInOtherInput) {
             e.preventDefault();
             if (selectedMatchIndex >= 0) {
-                const match = allMatches[selectedMatchIndex];
-                postMessage({
-                    command: 'openFile',
-                    filePath: match.filePath,
-                    line: match.line,
-                    column: match.column,
-                });
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+Enter or Cmd+Enter: Open in new tab, keep search open
+                    openMatchWithMode('newTab');
+                } else if (e.shiftKey) {
+                    // Shift+Enter: Open in split view, keep search open
+                    openMatchWithMode('splitView');
+                } else {
+                    // Enter: Open and close search
+                    openMatchWithMode('normal');
+                }
             }
         } else if (e.key === 'Escape') {
             postMessage({ command: 'close' });
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== searchInput && !isInOtherInput) {
+            // If user starts typing a regular character and not already in an input, focus search
+            searchInput.focus();
         }
     });
 
