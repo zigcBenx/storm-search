@@ -45,13 +45,29 @@ export function getWebviewContent(options: WebviewContentOptions): string {
 </head>
 <body class="${options.wordWrap === 'off' ? '' : 'wrap-lines'}">
     <div class="search-header">
-        <input
-            type="text"
-            class="search-input"
-            id="searchInput"
-            placeholder="Search everywhere..."
-            autofocus
-        />
+        <div class="search-input-container">
+            <input
+                type="text"
+                class="search-input"
+                id="searchInput"
+                placeholder="Search everywhere..."
+                autofocus
+            />
+            <button class="filter-toggle-button" id="filterToggleButton" title="Toggle file mask filter">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M1 2h14v2l-5 5v5l-4-2V9L1 4V2z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="filter-container" id="filterContainer" style="display: none;">
+            <label class="filter-label">File mask:</label>
+            <input
+                type="text"
+                class="file-mask-input"
+                id="fileMaskInput"
+                placeholder="*.ts, *.js (comma-separated)"
+            />
+        </div>
         <div class="scope-container">
             <div class="scope-buttons">
                 <button class="scope-button active" data-scope="project">Project</button>
