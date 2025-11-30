@@ -346,7 +346,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 </div>`;
             }
             const highlighted = highlightText(match.preview, currentQuery, match.previewColumn);
-            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})">
+            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId})">
                 <span class="match-line-number">[${match.line}]</span>
                 <span class="match-text">${highlighted}</span>
             </div>`;
@@ -411,6 +411,21 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     // Make available globally for onclick handlers
     // @ts-ignore
     window.selectMatchById = selectMatchById;
+
+    function openMatchById(matchId: number) {
+        if (matchId < 0 || matchId >= allMatches.length) return;
+
+        const match = allMatches[matchId];
+        postMessage({
+            command: 'openFile',
+            filePath: match.filePath,
+            line: match.line,
+            column: match.column
+        });
+    }
+    // Make available globally for ondblclick handlers
+    // @ts-ignore
+    window.openMatchById = openMatchById;
 
     function handleFileContent(filePath: string, content: string, colorizedLines: string[] | null) {
         fileContentsCache[filePath] = {
