@@ -15,6 +15,9 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     };
 
     const searchInput = document.getElementById('searchInput')!;
+    const filterToggleButton = document.getElementById('filterToggleButton')!;
+    const filterContainer = document.getElementById('filterContainer') as HTMLElement;
+    const fileMaskInput = document.getElementById('fileMaskInput') as HTMLInputElement;
     const scopeButtons = document.querySelectorAll('.scope-button');
     const scopeInputContainer = document.querySelector('.scope-input-container') as HTMLElement;
     const scopePathInput = document.getElementById('scopePathInput') as HTMLInputElement;
@@ -28,6 +31,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     let allFiles: Set<string> = new Set();
     let currentScope: string = 'project';
     let scopePath: string = '';
+    let fileMask: string = '';
 
     let selectedMatchIndex = -1;
     let currentQuery = '';
@@ -84,6 +88,21 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         }).join(',');
     }
 
+    /**
+     * Converts file mask patterns to include patterns.
+     * Supports patterns like "*.ts", "*.js", etc.
+     * Examples: "*.ts" becomes "**\/*.ts"
+     *           "*.ts,*.js" becomes "**\/*.ts,**\/*.js"
+     */
+    function convertFileMaskToPattern(mask: string): string {
+        const masks = mask.split(',').map(m => m.trim()).filter(m => m);
+        return masks.map(m => {
+            // If mask already has path separator or **, use as-is
+            // Otherwise, prepend **/ to match files anywhere
+            return m.includes('/') || m.startsWith('**') ? m : '**/' + m;
+        }).join(',');
+    }
+
     function performSearch() {
         const searchText = (searchInput as HTMLInputElement).value.trim();
 
@@ -92,10 +111,34 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             return;
         }
 
-        // Build include pattern based on current scope
+        // Build include pattern based on current scope and file mask
         let includePattern: string | undefined = undefined;
+        const currentFileMask = fileMask.trim();
+
         if (currentScope === 'directory' && scopePath) {
-            includePattern = convertPathsToGlobPatterns(scopePath);
+            const dirPattern = convertPathsToGlobPatterns(scopePath);
+
+            if (currentFileMask) {
+                // Combine directory scope with file mask
+                // For each directory, append the file mask patterns
+                const dirPaths = scopePath.split(',').map(p => p.trim()).filter(p => p);
+                const masks = currentFileMask.split(',').map(m => m.trim()).filter(m => m);
+
+                const combined: string[] = [];
+                dirPaths.forEach(dir => {
+                    masks.forEach(mask => {
+                        const dirBase = dir.includes('*') ? dir : dir + '/';
+                        const maskPattern = mask.startsWith('*') ? '**/' + mask : mask;
+                        combined.push(dirBase + maskPattern);
+                    });
+                });
+                includePattern = combined.join(',');
+            } else {
+                includePattern = dirPattern;
+            }
+        } else if (currentFileMask) {
+            // Only file mask, no directory scope
+            includePattern = convertFileMaskToPattern(currentFileMask);
         }
 
         currentQuery = searchText;
@@ -114,6 +157,27 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     }
 
     searchInput.addEventListener('input', () => {
+        performSearch();
+    });
+
+    // Filter toggle functionality
+    filterToggleButton.addEventListener('click', () => {
+        const isVisible = filterContainer.style.display !== 'none';
+
+        if (isVisible) {
+            // Hide filter
+            filterContainer.style.display = 'none';
+            filterToggleButton.classList.remove('active');
+        } else {
+            // Show filter and focus on input
+            filterContainer.style.display = 'flex';
+            filterToggleButton.classList.add('active');
+            fileMaskInput.focus();
+        }
+    });
+
+    fileMaskInput.addEventListener('input', () => {
+        fileMask = fileMaskInput.value.trim();
         performSearch();
     });
 
@@ -282,7 +346,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 </div>`;
             }
             const highlighted = highlightText(match.preview, currentQuery, match.previewColumn);
-            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})">
+            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId})">
                 <span class="match-line-number">[${match.line}]</span>
                 <span class="match-text">${highlighted}</span>
             </div>`;
@@ -347,6 +411,21 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     // Make available globally for onclick handlers
     // @ts-ignore
     window.selectMatchById = selectMatchById;
+
+    function openMatchById(matchId: number) {
+        if (matchId < 0 || matchId >= allMatches.length) return;
+
+        const match = allMatches[matchId];
+        postMessage({
+            command: 'openFile',
+            filePath: match.filePath,
+            line: match.line,
+            column: match.column
+        });
+    }
+    // Make available globally for ondblclick handlers
+    // @ts-ignore
+    window.openMatchById = openMatchById;
 
     function handleFileContent(filePath: string, content: string, colorizedLines: string[] | null) {
         fileContentsCache[filePath] = {
