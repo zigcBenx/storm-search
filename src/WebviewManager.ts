@@ -164,7 +164,7 @@ export class WebviewManager {
 
             case 'openFile':
                 if (message.filePath && message.line !== undefined) {
-                    await this.handleOpenFile(panel, message.filePath, message.line, message.column);
+                    await this.handleOpenFile(panel, message.filePath, message.line, message.column, message.openMode);
                 }
                 break;
 
@@ -246,10 +246,29 @@ export class WebviewManager {
         }
     }
 
-    private async handleOpenFile(panel: vscode.WebviewPanel, filePath: string, line: number, column: number): Promise<void> {
+    private async handleOpenFile(panel: vscode.WebviewPanel, filePath: string, line: number, column: number, openMode?: 'normal' | 'newTab' | 'splitView'): Promise<void> {
         try {
-            await this.fileService.openFileAtLocation(filePath, line, column);
-            panel.dispose();
+            let viewColumn: vscode.ViewColumn;
+            const shouldClosePanel = openMode === 'normal' || !openMode;
+
+            switch (openMode) {
+                case 'splitView':
+                    // Open in split view (beside current panel)
+                    viewColumn = vscode.ViewColumn.Beside;
+                    break;
+                case 'newTab':
+                case 'normal':
+                default:
+                    // Open in active column
+                    viewColumn = vscode.ViewColumn.Active;
+                    break;
+            }
+
+            await this.fileService.openFileAtLocation(filePath, line, column, viewColumn);
+
+            if (shouldClosePanel) {
+                panel.dispose();
+            }
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error}`);
         }

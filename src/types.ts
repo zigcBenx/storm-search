@@ -49,6 +49,7 @@ export type WebviewMessage = {
     filePath: string;
     line: number;
     column: number;
+    openMode?: 'normal' | 'newTab' | 'splitView';
 } | {
     command: 'close';
 } | {

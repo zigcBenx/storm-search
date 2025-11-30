@@ -8,10 +8,10 @@ export class FileService {
         return document.getText();
     }
 
-    async openFileAtLocation(filePath: string, line: number, column: number): Promise<void> {
+    async openFileAtLocation(filePath: string, line: number, column: number, viewColumn?: vscode.ViewColumn): Promise<void> {
         const uri = vscode.Uri.file(filePath);
         const document = await vscode.workspace.openTextDocument(uri);
-        const editor = await vscode.window.showTextDocument(document);
+        const editor = await vscode.window.showTextDocument(document, viewColumn);
 
         const position = new vscode.Position(line - 1, column);
         editor.selection = new vscode.Selection(position, position);
