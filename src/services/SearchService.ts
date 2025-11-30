@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { FileSearchResult, SearchMatch, SearchOptions } from '../types';
-import { EXCLUDE_PATTERNS, BINARY_EXTENSIONS, DEFAULT_SEARCH_OPTIONS } from '../constants';
+import { BINARY_EXTENSIONS, DEFAULT_SEARCH_OPTIONS } from '../constants';
 import { escapeRegExp, matchGlob } from '../util';
 
 export class SearchService {
@@ -15,11 +15,35 @@ export class SearchService {
     }
 
     async getSearchableFiles(): Promise<vscode.Uri[]> {
-        const allExcludePatterns = EXCLUDE_PATTERNS;
+        // Get search exclude patterns from VSCode settings
+        const searchConfig = vscode.workspace.getConfiguration('search');
+        const searchExclude = searchConfig.get<Record<string, boolean>>('exclude', {});
+        const filesConfig = vscode.workspace.getConfiguration('files');
+        const filesExclude = filesConfig.get<Record<string, boolean>>('exclude', {});
+
+        // Combine exclude patterns from both settings
+        const allExcludePatterns: string[] = [];
+
+        // Add patterns from search.exclude
+        for (const [pattern, enabled] of Object.entries(searchExclude)) {
+            if (enabled) {
+                allExcludePatterns.push(pattern);
+            }
+        }
+
+        // Add patterns from files.exclude that aren't already in search.exclude
+        for (const [pattern, enabled] of Object.entries(filesExclude)) {
+            if (enabled && !searchExclude.hasOwnProperty(pattern)) {
+                allExcludePatterns.push(pattern);
+            }
+        }
+
+        // Add binary file extensions
         for (const binaryExtension of BINARY_EXTENSIONS) {
             allExcludePatterns.push(`**/*.${binaryExtension}`);
         }
-        const excludeGlob = `{${allExcludePatterns.join(',')}}`;
+
+        const excludeGlob = allExcludePatterns.length > 0 ? `{${allExcludePatterns.join(',')}}` : undefined;
         const cancellationTokenSource = new vscode.CancellationTokenSource();
         const timer = setTimeout(() => {
             cancellationTokenSource.cancel();
