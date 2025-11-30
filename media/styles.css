@@ -30,6 +30,7 @@ body {
     font-size: 13px;
     padding: 6px 10px;
     font-family: var(--vscode-font-family);
+    margin-bottom: 8px;
 }
 
 .search-input:focus {
@@ -38,6 +39,85 @@ body {
 
 .search-input::placeholder {
     color: var(--vscode-input-placeholderForeground);
+}
+
+.scope-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.scope-buttons {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.scope-button {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: none;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: var(--vscode-font-family);
+    cursor: pointer;
+    border-right: 1px solid var(--vscode-input-border);
+    transition: background 0.1s;
+}
+
+.scope-button:last-child {
+    border-right: none;
+}
+
+.scope-button:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.scope-button.active {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.scope-input-container {
+    display: flex;
+    flex: 1;
+    gap: 4px;
+    align-items: center;
+}
+
+.scope-path-input {
+    flex: 1;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    outline: none;
+    color: var(--vscode-input-foreground);
+    font-size: 12px;
+    padding: 4px 8px;
+    font-family: var(--vscode-font-family);
+}
+
+.scope-path-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.scope-browse-button {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-family: var(--vscode-font-family);
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.scope-browse-button:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .content-container {

@@ -40,9 +40,36 @@ export class WebviewManager {
         this.createPanel();
     }
 
-    showNewTab(): void {
+    showNewTab(initialSearchText?: string): void {
         // Always create a new panel
-        this.createPanel();
+        const panelId = this.createPanel();
+
+        if (initialSearchText) {
+            const panel = this.panels.get(panelId);
+            if (panel) {
+                setTimeout(() => {
+                    panel.webview.postMessage({
+                        command: 'setInitialSearchText',
+                        text: initialSearchText
+                    });
+                }, 100);
+            }
+        }
+    }
+
+    showWithDirectory(directoryPath: string, initialSearchText?: string): void {
+        const panelId = this.createPanel();
+        const panel = this.panels.get(panelId);
+        if (panel) {
+            // Send initial directory and search text to webview after it's ready
+            setTimeout(() => {
+                panel.webview.postMessage({
+                    command: 'setInitialDirectory',
+                    path: directoryPath,
+                    searchText: initialSearchText
+                });
+            }, 100);
+        }
     }
 
     dispose(): void {
@@ -53,7 +80,7 @@ export class WebviewManager {
         this.syntaxHighlightService.dispose();
     }
 
-    private createPanel(): void {
+    private createPanel(): string {
         this.panelCounter++;
         const panelId = `search-${this.panelCounter}`;
         const tabNumber = this.panels.size + 1;
@@ -102,6 +129,7 @@ export class WebviewManager {
         });
         this.setupMessageHandler(panelId, panel);
         this.setupPanelDisposal(panelId, panel);
+        return panelId;
     }
 
     private setupMessageHandler(panelId: string, panel: vscode.WebviewPanel): void {
@@ -124,7 +152,7 @@ export class WebviewManager {
 
             case 'search':
                 if (message.text) {
-                    await this.handleSearch(panelId, panel, message.text);
+                    await this.handleSearch(panelId, panel, message.text, message.includePattern, message.excludePattern);
                 }
                 break;
 
@@ -139,10 +167,14 @@ export class WebviewManager {
                     await this.handleOpenFile(panel, message.filePath, message.line, message.column);
                 }
                 break;
+
+            case 'pickDirectory':
+                await this.handlePickDirectory(panel);
+                break;
         }
     }
 
-    private async handleSearch(panelId: string, panel: vscode.WebviewPanel, query: string): Promise<void> {
+    private async handleSearch(panelId: string, panel: vscode.WebviewPanel, query: string, includePattern?: string, excludePattern?: string): Promise<void> {
         try {
             this.panelSearches.set(panelId, query);
 
@@ -157,7 +189,7 @@ export class WebviewManager {
                 }
 
                 const batch = searchableFiles.slice(i, i + searchOptions.batchSize);
-                const results = await this.searchService.search(batch, query);
+                const results = await this.searchService.search(batch, query, includePattern, excludePattern);
                 if (results.length === 0) {
                     continue;
                 }
@@ -220,6 +252,28 @@ export class WebviewManager {
             panel.dispose();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+        }
+    }
+
+    private async handlePickDirectory(panel: vscode.WebviewPanel): Promise<void> {
+        try {
+            const result = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Directory',
+                title: 'Select Search Scope Directory'
+            });
+
+            if (result && result[0]) {
+                const selectedPath = vscode.workspace.asRelativePath(result[0], false);
+                panel.webview.postMessage({
+                    command: 'directorySelected',
+                    path: selectedPath
+                });
+            }
+        } catch (error) {
+            console.error('Error picking directory:', error);
         }
     }
 

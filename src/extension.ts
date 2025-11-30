@@ -20,7 +20,36 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     );
 
-    context.subscriptions.push(openSearchCommand, openNewSearchTabCommand);
+    const searchInFolderCommand = vscode.commands.registerCommand(
+        'custom-search.searchInFolder',
+        async (uri?: vscode.Uri) => {
+            // Get selected text from active editor
+            let selectedText: string | undefined;
+            const editor = vscode.window.activeTextEditor;
+            if (editor && !editor.selection.isEmpty) {
+                selectedText = editor.document.getText(editor.selection);
+            }
+
+            // Handle folder context menu
+            if (uri && uri.fsPath) {
+                try {
+                    const fileStat = await vscode.workspace.fs.stat(uri);
+                    if (fileStat.type === vscode.FileType.Directory) {
+                        const relativePath = vscode.workspace.asRelativePath(uri, false);
+                        webviewManager?.showWithDirectory(relativePath, selectedText);
+                        return;
+                    }
+                } catch (error) {
+                    // Ignore error and fall through to default
+                }
+            }
+
+            // Fallback: open normal search tab (potentially with selected text)
+            webviewManager?.showNewTab(selectedText);
+        }
+    );
+
+    context.subscriptions.push(openSearchCommand, openNewSearchTabCommand, searchInFolderCommand);
 }
 
 export function deactivate(): void {

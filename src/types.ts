@@ -39,6 +39,8 @@ export interface FileSearchResult {
 export type WebviewMessage = {
     command: 'search'
     text: string;
+    includePattern?: string;
+    excludePattern?: string;
 } | {
     command: 'getFileContent'
     filePath: string;
@@ -49,6 +51,8 @@ export type WebviewMessage = {
     column: number;
 } | {
     command: 'close';
+} | {
+    command: 'pickDirectory';
 }
 
 export interface SearchOptions {
