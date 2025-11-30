@@ -40,14 +40,26 @@
       {
         "command": "custom-search.openNewSearchTab",
         "title": "Storm Search: Open New Search Tab"
+      },
+      {
+        "command": "custom-search.searchInFolder",
+        "title": "Storm Search: Search in Folder"
       }
     ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "custom-search.searchInFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "4_search"
+        }
+      ]
+    },
     "keybindings": [
       {
-        "command": "custom-search.openNewSearchTab",
+        "command": "custom-search.searchInFolder",
         "key": "ctrl+shift+f",
-        "mac": "cmd+shift+f",
-        "when": "editorTextFocus || !editorFocus"
+        "mac": "cmd+shift+f"
       }
     ]
   },

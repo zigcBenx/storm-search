@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
 import { FileSearchResult, SearchMatch, SearchOptions } from '../types';
 import { EXCLUDE_PATTERNS, BINARY_EXTENSIONS, DEFAULT_SEARCH_OPTIONS } from '../constants';
-import { escapeRegExp } from '../util';
-import path from 'path';
+import { escapeRegExp, matchGlob } from '../util';
 
 export class SearchService {
     private options: SearchOptions;
@@ -60,15 +59,50 @@ export class SearchService {
         return files;
     }
 
-    async search(files: vscode.Uri[], query: string): Promise<FileSearchResult[]> {
+    async search(files: vscode.Uri[], query: string, includePattern?: string, excludePattern?: string): Promise<FileSearchResult[]> {
         const fileMatchMap = new Map<string, SearchMatch[]>();
         if (!query) {
             return [];
         }
 
+        // Filter files based on include/exclude patterns
+        let filteredFiles = files;
+        if (includePattern || excludePattern) {
+            filteredFiles = this.filterFilesByPatterns(files, includePattern, excludePattern);
+        }
+
         const queryLower = query.toLowerCase();
-        await this.searchInBatches(files, queryLower, fileMatchMap);
+        await this.searchInBatches(filteredFiles, queryLower, fileMatchMap);
         return this.convertMapToResults(fileMatchMap);
+    }
+
+    private filterFilesByPatterns(files: vscode.Uri[], includePattern?: string, excludePattern?: string): vscode.Uri[] {
+        return files.filter((file) => {
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(file);
+            const relativePath = workspaceFolder
+                ? vscode.workspace.asRelativePath(file, false)
+                : file.fsPath;
+
+            // If include pattern is specified, file must match it
+            if (includePattern && includePattern.trim()) {
+                const patterns = includePattern.split(',').map(p => p.trim()).filter(p => p);
+                const matchesInclude = patterns.some(pattern => matchGlob(pattern, relativePath));
+                if (!matchesInclude) {
+                    return false;
+                }
+            }
+
+            // If exclude pattern is specified, file must not match it
+            if (excludePattern && excludePattern.trim()) {
+                const patterns = excludePattern.split(',').map(p => p.trim()).filter(p => p);
+                const matchesExclude = patterns.some(pattern => matchGlob(pattern, relativePath));
+                if (matchesExclude) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
     }
 
     private async searchInBatches(

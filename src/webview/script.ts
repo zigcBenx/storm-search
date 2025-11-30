@@ -15,6 +15,10 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     };
 
     const searchInput = document.getElementById('searchInput')!;
+    const scopeButtons = document.querySelectorAll('.scope-button');
+    const scopeInputContainer = document.querySelector('.scope-input-container') as HTMLElement;
+    const scopePathInput = document.getElementById('scopePathInput') as HTMLInputElement;
+    const scopeBrowseButton = document.getElementById('scopeBrowseButton')!;
     const resultsHeader = document.getElementById('resultsHeader')!;
     const resultsList = document.getElementById('resultsList')!;
     const previewHeader = document.getElementById('previewHeader')!;
@@ -22,6 +26,8 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
     let allMatches: SearchMatchWithId[] = [];
     let allFiles: Set<string> = new Set();
+    let currentScope: string = 'project';
+    let scopePath: string = '';
 
     let selectedMatchIndex = -1;
     let currentQuery = '';
@@ -51,16 +57,36 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             case 'clearCache':
                 handleClearCache(message.filePath);
                 break;
+            case 'directorySelected':
+                handleDirectorySelected(message.path);
+                break;
+            case 'setInitialDirectory':
+                handleSetInitialDirectory(message.path, message.searchText);
+                break;
+            case 'setInitialSearchText':
+                handleSetInitialSearchText(message.text);
+                break;
         }
     });
 
-    searchInput.addEventListener('input', (event) => {
-        if (!event.target) return;
-        const searchText = (event.target as HTMLInputElement).value.trim();
+    function performSearch() {
+        const searchText = (searchInput as HTMLInputElement).value.trim();
 
         if (!searchText) {
             clearResults();
             return;
+        }
+
+        // If directory scope is selected and a path is set, use it as include pattern
+        let includePattern: string | undefined = undefined;
+        if (currentScope === 'directory' && scopePath) {
+            // Handle comma-separated paths
+            const paths = scopePath.split(',').map(p => p.trim()).filter(p => p);
+            includePattern = paths.map(path => {
+                // If path already contains glob patterns (* or **), use it as-is
+                // Otherwise, append /**/* to search everything under the directory
+                return path.includes('*') ? path : path + '/**/*';
+            }).join(',');
         }
 
         currentQuery = searchText;
@@ -69,8 +95,52 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         // Ensure a longer delay for short queries as they are more likely to change
         const timeoutDelay = searchText.length < 3 ? 500 : 75;
         searchTimeout = setTimeout(() => {
-            postMessage({ command: 'search', text: searchText });
+            postMessage({
+                command: 'search',
+                text: searchText,
+                includePattern: includePattern,
+                excludePattern: undefined
+            });
         }, timeoutDelay);
+    }
+
+    searchInput.addEventListener('input', () => {
+        performSearch();
+    });
+
+    // Scope selector logic
+    scopeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const scope = button.getAttribute('data-scope');
+            if (!scope) return;
+
+            // Update active button
+            scopeButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            currentScope = scope;
+
+            // Show/hide scope input based on selected scope
+            if (scope === 'directory') {
+                scopeInputContainer.style.display = 'flex';
+            } else {
+                scopeInputContainer.style.display = 'none';
+                scopePath = '';
+                scopePathInput.value = '';
+            }
+
+            performSearch();
+        });
+    });
+
+    scopeBrowseButton.addEventListener('click', () => {
+        postMessage({ command: 'pickDirectory' });
+    });
+
+    // Update scopePath and perform search when user manually edits the path input
+    scopePathInput.addEventListener('input', () => {
+        scopePath = scopePathInput.value.trim();
+        performSearch();
     });
 
     let scrollDebounce: any = null;
@@ -284,6 +354,37 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         if (fileContentsCache[filePath]) {
             delete fileContentsCache[filePath];
         }
+    }
+
+    function handleDirectorySelected(path: string) {
+        scopePath = path;
+        scopePathInput.value = path;
+        performSearch();
+    }
+
+    function handleSetInitialDirectory(path: string, searchText?: string) {
+        // Switch to directory scope
+        scopeButtons.forEach(btn => btn.classList.remove('active'));
+        const directoryButton = document.querySelector('[data-scope="directory"]');
+        if (directoryButton) {
+            directoryButton.classList.add('active');
+        }
+
+        currentScope = 'directory';
+        scopePath = path;
+        scopePathInput.value = path;
+        scopeInputContainer.style.display = 'flex';
+
+        // Set initial search text if provided
+        if (searchText) {
+            (searchInput as HTMLInputElement).value = searchText;
+            performSearch();
+        }
+    }
+
+    function handleSetInitialSearchText(text: string) {
+        (searchInput as HTMLInputElement).value = text;
+        performSearch();
     }
 
     function displayFilePreview(filePath: string, lineNumber: number, columnNumber: number) {

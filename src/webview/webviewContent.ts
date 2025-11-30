@@ -52,6 +52,21 @@ export function getWebviewContent(options: WebviewContentOptions): string {
             placeholder="Search everywhere..."
             autofocus
         />
+        <div class="scope-container">
+            <div class="scope-buttons">
+                <button class="scope-button active" data-scope="project">Project</button>
+                <button class="scope-button" data-scope="directory">Directory</button>
+            </div>
+            <div class="scope-input-container" style="display: none;">
+                <input
+                    type="text"
+                    class="scope-path-input"
+                    id="scopePathInput"
+                    placeholder="path/to/dir or path1/**,path2/** (comma-separated)"
+                />
+                <button class="scope-browse-button" id="scopeBrowseButton" title="Browse...">...</button>
+            </div>
+        </div>
     </div>
 
     <div class="content-container">
