@@ -1,42 +1,5 @@
 import { SearchOptions } from './types';
 
-export const EXCLUDE_PATTERNS = [
-    '**/node_modules/**',
-    '**/.next/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/out/**',
-    '**/.git/**',
-    '**/.svn/**',
-    '**/.hg/**',
-    '**/CVS/**',
-    '**/.DS_Store',
-    '**/Thumbs.db',
-    '**/*.min.js',
-    '**/*.min.css',
-    '**/bower_components/**',
-    '**/vendor/**',
-    '**/__pycache__/**',
-    '**/*.pyc',
-    '**/venv/**',
-    '**/.venv/**',
-    '**/target/**',
-    '**/.gradle/**',
-    '**/.idea/**',
-    '**/.vscode/**',
-    '**/coverage/**',
-    '**/.nyc_output/**',
-    '**/tmp/**',
-    '**/temp/**',
-    '**/.cache/**',
-    '**/public/build/**',
-    '**/.nuxt/**',
-    '**/generated/**',
-    '**/*.lock',
-    '**/package-lock.json',
-    '**/yarn.lock'
-];
-
 export const BINARY_EXTENSIONS = new Set([
     'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'svg', 'webp',
     'mp4', 'avi', 'mov', 'wmv', 'flv', 'mp3', 'wav', 'ogg',
