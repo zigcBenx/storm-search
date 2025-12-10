@@ -18,6 +18,7 @@ export class SearchService {
         // Get search exclude patterns from VSCode settings
         const searchConfig = vscode.workspace.getConfiguration('search');
         const searchExclude = searchConfig.get<Record<string, boolean>>('exclude', {});
+        const useIgnoreFiles = searchConfig.get<boolean>('useIgnoreFiles', true);
         const filesConfig = vscode.workspace.getConfiguration('files');
         const filesExclude = filesConfig.get<Record<string, boolean>>('exclude', {});
 
@@ -36,6 +37,12 @@ export class SearchService {
             if (enabled && !searchExclude.hasOwnProperty(pattern)) {
                 allExcludePatterns.push(pattern);
             }
+        }
+
+        // Add patterns from .gitignore if useIgnoreFiles is enabled
+        if (useIgnoreFiles) {
+            const gitignorePatterns = await this.parseGitignore();
+            allExcludePatterns.push(...gitignorePatterns);
         }
 
         // Add binary file extensions
@@ -241,5 +248,83 @@ export class SearchService {
         });
 
         return results;
+    }
+
+    /**
+     * Parse .gitignore files from workspace roots and convert to glob patterns
+     */
+    private async parseGitignore(): Promise<string[]> {
+        const patterns: string[] = [];
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+
+        if (!workspaceFolders) {
+            return patterns;
+        }
+
+        for (const folder of workspaceFolders) {
+            const gitignoreUri = vscode.Uri.joinPath(folder.uri, '.gitignore');
+            try {
+                const content = await vscode.workspace.fs.readFile(gitignoreUri);
+                const text = new TextDecoder('utf-8').decode(content);
+                const lines = text.split('\n');
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    
+                    // Skip empty lines and comments
+                    if (!trimmed || trimmed.startsWith('#')) {
+                        continue;
+                    }
+
+                    // Skip negation patterns (not supported by VSCode exclude)
+                    if (trimmed.startsWith('!')) {
+                        continue;
+                    }
+
+                    const globPattern = this.gitignoreToGlob(trimmed);
+                    if (globPattern) {
+                        patterns.push(globPattern);
+                    }
+                }
+            } catch {
+                // .gitignore doesn't exist or can't be read, skip
+            }
+        }
+
+        return patterns;
+    }
+
+    /**
+     * Convert a gitignore pattern to a VSCode glob pattern
+     */
+    private gitignoreToGlob(pattern: string): string {
+        let result = pattern;
+
+        // Remove trailing spaces (gitignore behavior)
+        result = result.trimEnd();
+
+        // Handle rooted patterns (starting with /)
+        const isRooted = result.startsWith('/');
+        if (isRooted) {
+            result = result.slice(1);
+        }
+
+        // Handle directory patterns (ending with /)
+        const isDirectory = result.endsWith('/');
+        if (isDirectory) {
+            result = result.slice(0, -1);
+        }
+
+        // If not rooted, pattern matches anywhere - prepend **/ if not already a glob pattern
+        if (!isRooted && !result.startsWith('**/') && !result.startsWith('*')) {
+            result = `**/${result}`;
+        }
+
+        // For directory patterns, also match contents
+        if (isDirectory) {
+            result = `${result}/**`;
+        }
+
+        return result;
     }
 }
