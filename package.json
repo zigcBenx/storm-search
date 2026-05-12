@@ -29,7 +29,11 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:custom-search.openSearch",
+    "onCommand:custom-search.openNewSearchTab",
+    "onCommand:custom-search.searchInFolder"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
