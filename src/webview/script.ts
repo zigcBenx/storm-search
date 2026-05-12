@@ -31,7 +31,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     let allFiles: Set<string> = new Set();
     let currentScope: string = 'project';
     let scopePath: string = '';
-    let fileMask: string = '';
+    let fileMask: string = fileMaskInput.value.trim();
 
     let selectedMatchIndex = -1;
     let currentQuery = '';
@@ -178,8 +178,17 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
     fileMaskInput.addEventListener('input', () => {
         fileMask = fileMaskInput.value.trim();
+        postMessage({
+            command: 'updateFileMask',
+            fileMask
+        });
         performSearch();
     });
+
+    if (fileMask) {
+        filterContainer.style.display = 'flex';
+        filterToggleButton.classList.add('active');
+    }
 
     // Scope selector logic
     scopeButtons.forEach(button => {
