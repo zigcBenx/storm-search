@@ -42,6 +42,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         }
     } = {};
     let searchTimeout: any = null;
+    let persistSearchStateTimeout: any = null;
 
     window.addEventListener('message', (event) => {
         const message = event.data;
@@ -86,10 +87,26 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     }
 
     function persistSearchState() {
+        if (persistSearchStateTimeout) {
+            clearTimeout(persistSearchStateTimeout);
+            persistSearchStateTimeout = null;
+        }
+
         postMessage({
             command: 'updateSearchState',
             state: getSearchState()
         });
+    }
+
+    function schedulePersistSearchState() {
+        if (persistSearchStateTimeout) {
+            clearTimeout(persistSearchStateTimeout);
+        }
+
+        persistSearchStateTimeout = setTimeout(() => {
+            persistSearchStateTimeout = null;
+            persistSearchState();
+        }, 250);
     }
 
     /**
@@ -124,7 +141,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
     function performSearch() {
         const searchText = (searchInput as HTMLInputElement).value.trim();
-        persistSearchState();
+        schedulePersistSearchState();
 
         if (!searchText) {
             clearResults();
