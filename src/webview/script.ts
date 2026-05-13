@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { FileSearchResult, SearchMatch, WebviewMessage } from "../types";
+import { FileSearchResult, SearchMatch, SearchState, WebviewMessage } from "../types";
 
 
 type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResult['icon'] };
@@ -42,6 +42,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         }
     } = {};
     let searchTimeout: any = null;
+    let persistSearchStateTimeout: any = null;
 
     window.addEventListener('message', (event) => {
         const message = event.data;
@@ -70,8 +71,43 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             case 'setInitialSearchText':
                 handleSetInitialSearchText(message.text);
                 break;
+            case 'restoreSearchState':
+                handleRestoreSearchState(message.state);
+                break;
         }
     });
+
+    function getSearchState(): SearchState {
+        return {
+            text: (searchInput as HTMLInputElement).value.trim(),
+            fileMask,
+            scope: currentScope === 'directory' ? 'directory' : 'project',
+            scopePath
+        };
+    }
+
+    function persistSearchState() {
+        if (persistSearchStateTimeout) {
+            clearTimeout(persistSearchStateTimeout);
+            persistSearchStateTimeout = null;
+        }
+
+        postMessage({
+            command: 'updateSearchState',
+            state: getSearchState()
+        });
+    }
+
+    function schedulePersistSearchState() {
+        if (persistSearchStateTimeout) {
+            clearTimeout(persistSearchStateTimeout);
+        }
+
+        persistSearchStateTimeout = setTimeout(() => {
+            persistSearchStateTimeout = null;
+            persistSearchState();
+        }, 250);
+    }
 
     /**
      * Converts directory paths to glob patterns for file filtering.
@@ -105,6 +141,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
     function performSearch() {
         const searchText = (searchInput as HTMLInputElement).value.trim();
+        schedulePersistSearchState();
 
         if (!searchText) {
             clearResults();
@@ -174,6 +211,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             filterToggleButton.classList.add('active');
             fileMaskInput.focus();
         }
+        persistSearchState();
     });
 
     fileMaskInput.addEventListener('input', () => {
@@ -476,18 +514,27 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         performSearch();
     }
 
+    function applyScope(scope: string) {
+        scopeButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-scope') === scope);
+        });
+
+        currentScope = scope === 'directory' ? 'directory' : 'project';
+
+        if (currentScope === 'directory') {
+            scopeInputContainer.style.display = 'flex';
+        } else {
+            scopeInputContainer.style.display = 'none';
+            scopePath = '';
+            scopePathInput.value = '';
+        }
+    }
+
     function handleSetInitialDirectory(path: string, searchText?: string) {
         // Switch to directory scope
-        scopeButtons.forEach(btn => btn.classList.remove('active'));
-        const directoryButton = document.querySelector('[data-scope="directory"]');
-        if (directoryButton) {
-            directoryButton.classList.add('active');
-        }
-
-        currentScope = 'directory';
+        applyScope('directory');
         scopePath = path;
         scopePathInput.value = path;
-        scopeInputContainer.style.display = 'flex';
 
         // Set initial search text if provided
         if (searchText) {
@@ -498,6 +545,23 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
     function handleSetInitialSearchText(text: string) {
         (searchInput as HTMLInputElement).value = text;
+        performSearch();
+    }
+
+    function handleRestoreSearchState(state: SearchState) {
+        (searchInput as HTMLInputElement).value = state.text;
+
+        fileMask = state.fileMask;
+        fileMaskInput.value = state.fileMask;
+        filterContainer.style.display = state.fileMask ? 'flex' : 'none';
+        filterToggleButton.classList.toggle('active', Boolean(state.fileMask));
+
+        applyScope(state.scope);
+        if (state.scope === 'directory') {
+            scopePath = state.scopePath;
+            scopePathInput.value = state.scopePath;
+        }
+
         performSearch();
     }
 

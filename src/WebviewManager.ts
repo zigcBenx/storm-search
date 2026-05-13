@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { WebviewMessage } from './types';
+import { SearchState, WebviewMessage } from './types';
 import { SearchService } from './services/SearchService';
 import { FileService } from './services/FileService';
 import { SyntaxHighlightService } from './services/SyntaxHighlightService';
@@ -16,6 +16,7 @@ export class WebviewManager {
     private syntaxHighlightService: SyntaxHighlightService;
     private disposables: vscode.Disposable[] = [];
     private panelCounter: number = 0;
+    private lastSearchState: SearchState | undefined;
 
     constructor(private context: vscode.ExtensionContext) {
         this.searchService = new SearchService();
@@ -37,7 +38,7 @@ export class WebviewManager {
             return;
         }
 
-        this.createPanel();
+        this.createPanel(true);
     }
 
     showNewTab(initialSearchText?: string): void {
@@ -80,7 +81,7 @@ export class WebviewManager {
         this.syntaxHighlightService.dispose();
     }
 
-    private createPanel(): string {
+    private createPanel(restoreLastState: boolean = false): string {
         this.panelCounter++;
         const panelId = `search-${this.panelCounter}`;
         const tabNumber = this.panels.size + 1;
@@ -129,6 +130,16 @@ export class WebviewManager {
         });
         this.setupMessageHandler(panelId, panel);
         this.setupPanelDisposal(panelId, panel);
+
+        if (restoreLastState && this.lastSearchState) {
+            setTimeout(() => {
+                panel.webview.postMessage({
+                    command: 'restoreSearchState',
+                    state: this.lastSearchState
+                });
+            }, 100);
+        }
+
         return panelId;
     }
 
@@ -154,6 +165,10 @@ export class WebviewManager {
                 if (message.text) {
                     await this.handleSearch(panelId, panel, message.text, message.includePattern, message.excludePattern);
                 }
+                break;
+
+            case 'updateSearchState':
+                this.lastSearchState = message.state;
                 break;
 
             case 'getFileContent':
