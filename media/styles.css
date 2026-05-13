@@ -46,7 +46,8 @@ body {
     color: var(--vscode-input-placeholderForeground);
 }
 
-.filter-toggle-button {
+.filter-toggle-button,
+.regex-toggle-button {
     background: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
     border: 1px solid var(--vscode-input-border);
@@ -59,11 +60,20 @@ body {
     transition: background 0.1s;
 }
 
-.filter-toggle-button:hover {
+.regex-toggle-button {
+    min-width: 32px;
+    font-weight: 600;
+    font-size: 12px;
+    font-family: var(--vscode-editor-font-family, var(--vscode-font-family));
+}
+
+.filter-toggle-button:hover,
+.regex-toggle-button:hover {
     background: var(--vscode-button-secondaryHoverBackground);
 }
 
-.filter-toggle-button.active {
+.filter-toggle-button.active,
+.regex-toggle-button.active {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
 }

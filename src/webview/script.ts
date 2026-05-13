@@ -15,6 +15,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     };
 
     const searchInput = document.getElementById('searchInput')!;
+    const regexToggleButton = document.getElementById('regexToggleButton')!;
     const filterToggleButton = document.getElementById('filterToggleButton')!;
     const filterContainer = document.getElementById('filterContainer') as HTMLElement;
     const fileMaskInput = document.getElementById('fileMaskInput') as HTMLInputElement;
@@ -32,9 +33,9 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     let currentScope: string = 'project';
     let scopePath: string = '';
     let fileMask: string = '';
+    let isRegexSearch = false;
 
     let selectedMatchIndex = -1;
-    let currentQuery = '';
     let fileContentsCache: {
         [key: string]: {
             content: string;
@@ -141,7 +142,6 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             includePattern = convertFileMaskToPattern(currentFileMask);
         }
 
-        currentQuery = searchText;
         clearTimeout(searchTimeout);
 
         // Use longer delay for short queries as they are more likely to change
@@ -151,12 +151,20 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 command: 'search',
                 text: searchText,
                 includePattern: includePattern,
-                excludePattern: undefined
+                excludePattern: undefined,
+                isRegex: isRegexSearch
             });
         }, timeoutDelay);
     }
 
     searchInput.addEventListener('input', () => {
+        performSearch();
+    });
+
+    regexToggleButton.addEventListener('click', () => {
+        isRegexSearch = !isRegexSearch;
+        regexToggleButton.classList.toggle('active', isRegexSearch);
+        regexToggleButton.setAttribute('aria-pressed', String(isRegexSearch));
         performSearch();
     });
 
@@ -254,6 +262,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                     relativePath: result.relativePath,
                     line: match.line,
                     column: match.column,
+                    matchLength: match.matchLength,
                     preview: match.preview,
                     previewColumn: match.previewColumn,
                     icon: result.icon
@@ -279,6 +288,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                     relativePath: result.relativePath,
                     line: match.line,
                     column: match.column,
+                    matchLength: match.matchLength,
                     preview: match.preview,
                     previewColumn: match.previewColumn,
                     icon: result.icon
@@ -345,7 +355,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                     <span class="file-name">${escapeHtml(fileName)}</span>
                 </div>`;
             }
-            const highlighted = highlightText(match.preview, currentQuery, match.previewColumn);
+            const highlighted = highlightText(match.preview, match.previewColumn, match.matchLength);
             html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId}, event)">
                 <span class="match-line-number">[${match.line}]</span>
                 <span class="match-text">${highlighted}</span>
@@ -366,17 +376,15 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         return textEscaper.innerHTML;
     }
 
-    function highlightText(text: string, query: string, column: number): string {
-        if (!query) return escapeHtml(text);
-
+    function highlightText(text: string, column: number, matchLength: number): string {
         const escapedText = escapeHtml(text);
-        const index = text.toLowerCase().indexOf(query.toLowerCase(), column);
+        const index = column;
 
-        if (index === -1) return escapedText;
+        if (index < 0 || matchLength <= 0) return escapedText;
 
         const before = escapeHtml(text.substring(0, index));
-        const match = escapeHtml(text.substring(index, index + query.length));
-        const after = escapeHtml(text.substring(index + query.length));
+        const match = escapeHtml(text.substring(index, index + matchLength));
+        const after = escapeHtml(text.substring(index + matchLength));
 
         return `${before}<span class="match-highlight">${match}</span>${after}`;
     }
@@ -405,7 +413,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 filePath: match.filePath
             });
         } else {
-            displayFilePreview(match.filePath, match.line, match.column);
+            displayFilePreview(match.filePath, match.line, match.column, match.matchLength);
         }
     };
     // Make available globally for onclick handlers
@@ -460,7 +468,12 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         };
 
         if (selectedMatchIndex >= 0 && allMatches[selectedMatchIndex].filePath === filePath) {
-            displayFilePreview(filePath, allMatches[selectedMatchIndex].line, allMatches[selectedMatchIndex].column);
+            displayFilePreview(
+                filePath,
+                allMatches[selectedMatchIndex].line,
+                allMatches[selectedMatchIndex].column,
+                allMatches[selectedMatchIndex].matchLength
+            );
         }
     }
 
@@ -501,7 +514,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         performSearch();
     }
 
-    function displayFilePreview(filePath: string, lineNumber: number, columnNumber: number) {
+    function displayFilePreview(filePath: string, lineNumber: number, columnNumber: number, matchLength: number) {
         const cached = fileContentsCache[filePath];
         if (!cached) return;
 
@@ -523,12 +536,12 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
                 // Add search query highlighting on top of syntax highlighting
                 if (isMatchLine) {
-                    lineContent = addSearchHighlightToColorizedLine(lineContent, lines[i], currentQuery, columnNumber);
+                    lineContent = addSearchHighlightToColorizedLine(lineContent, columnNumber, matchLength);
                 }
             } else {
                 // Fallback to plain highlighting
                 if (isMatchLine) {
-                    lineContent = highlightSearchQuery(lines[i], currentQuery, columnNumber);
+                    lineContent = highlightSearchQuery(lines[i], columnNumber, matchLength);
                 } else {
                     lineContent = lines[i].replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 }
@@ -584,42 +597,37 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         }
     }
 
-    function highlightSearchQuery(text: string, query: string, columnNumber: number): string {
-        if (!query) {
+    function highlightSearchQuery(text: string, columnNumber: number, matchLength: number): string {
+        if (matchLength <= 0) {
             return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
-        const index = text.toLowerCase().indexOf(query.toLowerCase(), columnNumber);
+        const index = columnNumber;
         if (index === -1) {
             return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         const before = text.substring(0, index).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const match = text.substring(index, index + query.length).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const after = text.substring(index + query.length).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const match = text.substring(index, index + matchLength).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const after = text.substring(index + matchLength).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         return `${before}<span class="match-highlight">${match}</span>${after}`;
     }
 
-    function addSearchHighlightToColorizedLine(colorizedHtml: string, plainText: string, query: string, columnNumber: number): string {
-        if (!query) return colorizedHtml;
-
-        const index = plainText.toLowerCase().indexOf(query.toLowerCase());
-        if (index === -1) return colorizedHtml;
-
+    function addSearchHighlightToColorizedLine(colorizedHtml: string, columnNumber: number, matchLength: number): string {
         // Create a temporary div to work with the HTML
         const temp = document.createElement('div');
         temp.innerHTML = colorizedHtml;
 
         // Get the text content and find the position
         const textContent = temp.textContent || '';
-        const matchIndex = textContent.toLowerCase().indexOf(query.toLowerCase(), columnNumber);
+        const matchIndex = columnNumber;
 
-        if (matchIndex === -1) return colorizedHtml;
+        if (matchIndex < 0 || matchIndex >= textContent.length || matchLength <= 0) return colorizedHtml;
 
         // Walk through the nodes and wrap the matching text
         let currentPos = 0;
-        const matchEnd = matchIndex + query.length;
+        const matchEnd = matchIndex + matchLength;
 
         function wrapTextNodes(node: Node) {
             if (node.nodeType === Node.TEXT_NODE) {

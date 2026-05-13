@@ -5,6 +5,7 @@ export interface SearchMatch {
     relativePath: string;
     line: number;
     column: number;
+    matchLength: number;
     previewColumn: number;
     preview: string;
 }
@@ -41,6 +42,7 @@ export type WebviewMessage = {
     text: string;
     includePattern?: string;
     excludePattern?: string;
+    isRegex?: boolean;
 } | {
     command: 'getFileContent'
     filePath: string;
