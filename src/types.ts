@@ -36,11 +36,21 @@ export interface FileSearchResult {
     icon?: ResolvedIconDefinition;
 }
 
+export interface SearchState {
+    text: string;
+    fileMask: string;
+    scope: 'project' | 'directory';
+    scopePath: string;
+}
+
 export type WebviewMessage = {
     command: 'search'
     text: string;
     includePattern?: string;
     excludePattern?: string;
+} | {
+    command: 'updateSearchState'
+    state: SearchState;
 } | {
     command: 'getFileContent'
     filePath: string;

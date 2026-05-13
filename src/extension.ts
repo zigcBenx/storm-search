@@ -44,8 +44,12 @@ export function activate(context: vscode.ExtensionContext): void {
                 }
             }
 
-            // Fallback: open normal search tab (potentially with selected text)
-            webviewManager?.showNewTab(selectedText);
+            // Fallback: selected text starts a fresh search; otherwise return to the last search.
+            if (selectedText) {
+                webviewManager?.showNewTab(selectedText);
+            } else {
+                webviewManager?.show();
+            }
         }
     );
 
