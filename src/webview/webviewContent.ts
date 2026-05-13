@@ -53,6 +53,13 @@ export function getWebviewContent(options: WebviewContentOptions): string {
                 placeholder="Search everywhere..."
                 autofocus
             />
+            <button
+                class="regex-toggle-button"
+                id="regexToggleButton"
+                title="Use regular expression"
+                aria-label="Use regular expression"
+                aria-pressed="false"
+            >.*</button>
             <button class="filter-toggle-button" id="filterToggleButton" title="Toggle file mask filter">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M1 2h14v2l-5 5v5l-4-2V9L1 4V2z"/>

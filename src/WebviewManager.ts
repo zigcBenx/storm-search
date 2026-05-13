@@ -152,7 +152,7 @@ export class WebviewManager {
 
             case 'search':
                 if (message.text) {
-                    await this.handleSearch(panelId, panel, message.text, message.includePattern, message.excludePattern);
+                    await this.handleSearch(panelId, panel, message.text, message.includePattern, message.excludePattern, message.isRegex);
                 }
                 break;
 
@@ -174,22 +174,23 @@ export class WebviewManager {
         }
     }
 
-    private async handleSearch(panelId: string, panel: vscode.WebviewPanel, query: string, includePattern?: string, excludePattern?: string): Promise<void> {
+    private async handleSearch(panelId: string, panel: vscode.WebviewPanel, query: string, includePattern?: string, excludePattern?: string, isRegex: boolean = false): Promise<void> {
         try {
-            this.panelSearches.set(panelId, query);
+            const searchId = `${isRegex ? 'regex' : 'literal'}:${query}`;
+            this.panelSearches.set(panelId, searchId);
 
             const searchableFiles = await this.searchService.getSearchableFiles();
             const searchOptions = this.searchService.getSearchOptions();
             let resultCount = 0;
 
             for (let i = 0; i < searchableFiles.length; i += searchOptions.batchSize) {
-                if (this.panelSearches.get(panelId) !== query) {
+                if (this.panelSearches.get(panelId) !== searchId) {
                     // A new search has been initiated in this panel, abort current search
                     return;
                 }
 
                 const batch = searchableFiles.slice(i, i + searchOptions.batchSize);
-                const results = await this.searchService.search(batch, query, includePattern, excludePattern);
+                const results = await this.searchService.search(batch, query, includePattern, excludePattern, isRegex);
                 if (results.length === 0) {
                     continue;
                 }
