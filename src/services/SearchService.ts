@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { FileSearchResult, SearchMatch, SearchOptions } from '../types';
 import { BINARY_EXTENSIONS, DEFAULT_SEARCH_OPTIONS } from '../constants';
-import { escapeRegExp, matchGlob } from '../util';
+import { escapeRegExp, GitIgnoreRule, isPathIgnoredByGitIgnore, matchGlob, parseGitIgnore } from '../util';
 
 export class SearchService {
     private options: SearchOptions;
@@ -18,6 +18,7 @@ export class SearchService {
         // Get search exclude patterns from VSCode settings
         const searchConfig = vscode.workspace.getConfiguration('search');
         const searchExclude = searchConfig.get<Record<string, boolean>>('exclude', {});
+        const useIgnoreFiles = searchConfig.get<boolean>('useIgnoreFiles', true);
         const filesConfig = vscode.workspace.getConfiguration('files');
         const filesExclude = filesConfig.get<Record<string, boolean>>('exclude', {});
 
@@ -50,9 +51,14 @@ export class SearchService {
             cancellationTokenSource.dispose();
         }, 1000);
 
-        const files = await vscode.workspace.findFiles('**/*', excludeGlob, this.options.maxFilesToSearch, cancellationTokenSource.token);;
+        let files = await vscode.workspace.findFiles('**/*', excludeGlob, this.options.maxFilesToSearch, cancellationTokenSource.token);
         clearTimeout(timer);
         cancellationTokenSource.dispose();
+
+        if (useIgnoreFiles) {
+            const gitIgnoreRulesByWorkspace = await this.getGitIgnoreRulesByWorkspace();
+            files = this.filterGitIgnoredFiles(files, gitIgnoreRulesByWorkspace);
+        }
 
         const collator = new Intl.Collator('en', { sensitivity: 'base' });
         files.sort((a, b) => {
@@ -81,6 +87,48 @@ export class SearchService {
             return pathA.length - pathB.length;
         });
         return files;
+    }
+
+    private async getGitIgnoreRulesByWorkspace(): Promise<Map<string, GitIgnoreRule[]>> {
+        const rulesByWorkspace = new Map<string, GitIgnoreRule[]>();
+        const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+
+        await Promise.all(workspaceFolders.map(async (workspaceFolder) => {
+            try {
+                const gitIgnoreUri = vscode.Uri.joinPath(workspaceFolder.uri, '.gitignore');
+                const bytes = await vscode.workspace.fs.readFile(gitIgnoreUri);
+                const rules = parseGitIgnore(new TextDecoder('utf-8', { fatal: false }).decode(bytes));
+
+                if (rules.length > 0) {
+                    rulesByWorkspace.set(workspaceFolder.uri.toString(), rules);
+                }
+            } catch (error) {
+                // Workspaces without a root .gitignore should search normally.
+            }
+        }));
+
+        return rulesByWorkspace;
+    }
+
+    private filterGitIgnoredFiles(files: vscode.Uri[], rulesByWorkspace: Map<string, GitIgnoreRule[]>): vscode.Uri[] {
+        if (rulesByWorkspace.size === 0) {
+            return files;
+        }
+
+        return files.filter((file) => {
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(file);
+            if (!workspaceFolder) {
+                return true;
+            }
+
+            const rules = rulesByWorkspace.get(workspaceFolder.uri.toString());
+            if (!rules) {
+                return true;
+            }
+
+            const relativePath = vscode.workspace.asRelativePath(file, false);
+            return !isPathIgnoredByGitIgnore(relativePath, rules);
+        });
     }
 
     async search(files: vscode.Uri[], query: string, includePattern?: string, excludePattern?: string): Promise<FileSearchResult[]> {
