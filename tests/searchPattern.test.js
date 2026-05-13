@@ -47,4 +47,22 @@ assert.deepEqual(
   'zero-length regex matches are ignored to avoid infinite result loops'
 );
 
+const reusablePattern = createSearchPattern('foo', true);
+assert.equal(
+  reusablePattern.expression,
+  undefined,
+  'search patterns do not expose shared mutable RegExp state'
+);
+assert.deepEqual(
+  findPatternMatches('foo foo', reusablePattern).map((match) => ({
+    index: match.index,
+    length: match.length,
+  })),
+  [
+    { index: 0, length: 3 },
+    { index: 4, length: 3 },
+  ],
+  'reusable search patterns still find every match'
+);
+
 console.log('searchPattern tests passed');

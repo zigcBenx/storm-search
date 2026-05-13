@@ -1,7 +1,8 @@
 import { escapeRegExp } from './util';
 
 export type SearchPattern = {
-    expression: RegExp;
+    source: string;
+    flags: string;
 };
 
 export type PatternMatch = {
@@ -15,8 +16,13 @@ export function createSearchPattern(query: string, isRegex: boolean): SearchPatt
     }
 
     try {
+        const source = isRegex ? query : escapeRegExp(query);
+        const flags = 'gi';
+        new RegExp(source, flags);
+
         return {
-            expression: new RegExp(isRegex ? query : escapeRegExp(query), 'gi')
+            source,
+            flags
         };
     } catch {
         return null;
@@ -25,12 +31,12 @@ export function createSearchPattern(query: string, isRegex: boolean): SearchPatt
 
 export function findPatternMatches(text: string, pattern: SearchPattern): PatternMatch[] {
     const matches: PatternMatch[] = [];
-    pattern.expression.lastIndex = 0;
+    const expression = new RegExp(pattern.source, pattern.flags);
 
     let match: RegExpExecArray | null;
-    while ((match = pattern.expression.exec(text)) !== null) {
+    while ((match = expression.exec(text)) !== null) {
         if (match[0].length === 0) {
-            pattern.expression.lastIndex++;
+            expression.lastIndex++;
             continue;
         }
 
