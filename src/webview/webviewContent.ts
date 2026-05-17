@@ -90,7 +90,7 @@ export function getWebviewContent(options: WebviewContentOptions): string {
             <div class="results-header" id="resultsHeader">
                 No results
             </div>
-            <div class="results-list" id="resultsList">
+            <div class="results-list" id="resultsList" tabindex="0">
                 <div class="empty-state">Start typing to search...</div>
             </div>
         </div>

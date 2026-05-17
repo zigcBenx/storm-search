@@ -44,6 +44,18 @@
       {
         "command": "custom-search.searchInFolder",
         "title": "Storm Search: Search in Folder"
+      },
+      {
+        "command": "custom-search.focusSearchInput",
+        "title": "Storm Search: Focus Search Input"
+      },
+      {
+        "command": "custom-search.focusSearchResults",
+        "title": "Storm Search: Focus Search Results"
+      },
+      {
+        "command": "custom-search.focusEditor",
+        "title": "Storm Search: Focus Editor"
       }
     ],
     "menus": {

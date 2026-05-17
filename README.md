@@ -85,6 +85,20 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 - Start typing anywhere to automatically focus the search box
 - Navigate and open files without touching the mouse
 
+**Command IDs for keybindings:**
+- `custom-search.focusSearchInput` - Focus and select the Storm Search input
+- `custom-search.focusSearchResults` - Focus the Storm Search results list
+- `custom-search.focusEditor` - Return focus to the active VS Code editor group
+
+Example `keybindings.json` entry:
+
+```json
+{
+  "key": "ctrl+alt+s",
+  "command": "custom-search.focusSearchInput"
+}
+```
+
 The search respects your VS Code `files.exclude` and `search.exclude` settings.
 
 

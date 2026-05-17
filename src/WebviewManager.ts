@@ -72,6 +72,21 @@ export class WebviewManager {
         }
     }
 
+    focusWebviewTarget(target: 'searchInput' | 'searchResults'): void {
+        const panel = Array.from(this.panels.values()).pop();
+        if (!panel) {
+            this.createPanel();
+            setTimeout(() => this.focusWebviewTarget(target), 100);
+            return;
+        }
+
+        panel.reveal();
+        panel.webview.postMessage({
+            command: 'focusTarget',
+            target
+        });
+    }
+
     dispose(): void {
         this.panels.forEach(panel => panel.dispose());
         this.panels.clear();

@@ -70,8 +70,27 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             case 'setInitialSearchText':
                 handleSetInitialSearchText(message.text);
                 break;
+            case 'focusTarget':
+                handleFocusTarget(message.target);
+                break;
         }
     });
+
+    function handleFocusTarget(target: string) {
+        if (target === 'searchInput') {
+            searchInput.focus();
+            (searchInput as HTMLInputElement).select();
+            return;
+        }
+
+        if (target === 'searchResults') {
+            resultsList.focus();
+
+            if (selectedMatchIndex < 0 && allMatches.length > 0) {
+                selectMatchById(0);
+            }
+        }
+    }
 
     /**
      * Converts directory paths to glob patterns for file filtering.
@@ -346,7 +365,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 </div>`;
             }
             const highlighted = highlightText(match.preview, currentQuery, match.previewColumn);
-            html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId}, event)">
+            html += `<div class="match-item" data-match-id="${match.matchId}" tabindex="-1" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId}, event)">
                 <span class="match-line-number">[${match.line}]</span>
                 <span class="match-text">${highlighted}</span>
             </div>`;
@@ -394,6 +413,9 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         const selectedItem = document.querySelector(`[data-match-id="${matchId}"]`);
         if (selectedItem) {
             selectedItem.classList.add('selected');
+            if (document.activeElement === resultsList) {
+                (selectedItem as HTMLElement).focus();
+            }
             selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 

@@ -49,7 +49,35 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     );
 
-    context.subscriptions.push(openSearchCommand, openNewSearchTabCommand, searchInFolderCommand);
+    const focusSearchInputCommand = vscode.commands.registerCommand(
+        'custom-search.focusSearchInput',
+        () => {
+            webviewManager?.focusWebviewTarget('searchInput');
+        }
+    );
+
+    const focusSearchResultsCommand = vscode.commands.registerCommand(
+        'custom-search.focusSearchResults',
+        () => {
+            webviewManager?.focusWebviewTarget('searchResults');
+        }
+    );
+
+    const focusEditorCommand = vscode.commands.registerCommand(
+        'custom-search.focusEditor',
+        async () => {
+            await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+        }
+    );
+
+    context.subscriptions.push(
+        openSearchCommand,
+        openNewSearchTabCommand,
+        searchInFolderCommand,
+        focusSearchInputCommand,
+        focusSearchResultsCommand,
+        focusEditorCommand
+    );
 }
 
 export function deactivate(): void {
