@@ -3,6 +3,14 @@ import { FileSearchResult, SearchMatch, SearchOptions } from '../types';
 import { BINARY_EXTENSIONS, DEFAULT_SEARCH_OPTIONS } from '../constants';
 import { escapeRegExp, matchGlob } from '../util';
 
+interface GitignoreRule {
+    pattern: string;
+    negated: boolean;
+    directoryOnly: boolean;
+    anchored: boolean;
+    hasSlash: boolean;
+}
+
 export class SearchService {
     private options: SearchOptions;
 
@@ -54,8 +62,11 @@ export class SearchService {
         clearTimeout(timer);
         cancellationTokenSource.dispose();
 
+        const gitignoreRules = await this.getGitignoreRules();
+        const searchableFiles = files.filter(file => !this.isIgnoredByGitignore(file, gitignoreRules));
+
         const collator = new Intl.Collator('en', { sensitivity: 'base' });
-        files.sort((a, b) => {
+        searchableFiles.sort((a, b) => {
             const pathA = a.path.split('/');
             const pathB = b.path.split('/');
 
@@ -80,7 +91,88 @@ export class SearchService {
             // If all segments match, shorter path (folder) comes first
             return pathA.length - pathB.length;
         });
-        return files;
+        return searchableFiles;
+    }
+
+    private async getGitignoreRules(): Promise<Map<string, GitignoreRule[]>> {
+        const rulesByWorkspaceFolder = new Map<string, GitignoreRule[]>();
+        const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+
+        await Promise.all(workspaceFolders.map(async (workspaceFolder) => {
+            const gitignoreUri = vscode.Uri.joinPath(workspaceFolder.uri, '.gitignore');
+            try {
+                const content = await vscode.workspace.fs.readFile(gitignoreUri);
+                const text = new TextDecoder('utf-8', { fatal: false }).decode(content);
+                rulesByWorkspaceFolder.set(workspaceFolder.uri.fsPath, this.parseGitignoreRules(text));
+            } catch (error) {
+                rulesByWorkspaceFolder.set(workspaceFolder.uri.fsPath, []);
+            }
+        }));
+
+        return rulesByWorkspaceFolder;
+    }
+
+    private parseGitignoreRules(content: string): GitignoreRule[] {
+        return content
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#'))
+            .map((line) => {
+                const negated = line.startsWith('!');
+                let pattern = negated ? line.slice(1) : line;
+                const anchored = pattern.startsWith('/');
+                pattern = anchored ? pattern.slice(1) : pattern;
+                const directoryOnly = pattern.endsWith('/');
+                pattern = directoryOnly ? pattern.slice(0, -1) : pattern;
+                return {
+                    pattern,
+                    negated,
+                    directoryOnly,
+                    anchored,
+                    hasSlash: pattern.includes('/')
+                };
+            })
+            .filter(rule => rule.pattern);
+    }
+
+    private isIgnoredByGitignore(file: vscode.Uri, rulesByWorkspaceFolder: Map<string, GitignoreRule[]>): boolean {
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(file);
+        if (!workspaceFolder) {
+            return false;
+        }
+
+        const rules = rulesByWorkspaceFolder.get(workspaceFolder.uri.fsPath);
+        if (!rules || rules.length === 0) {
+            return false;
+        }
+
+        const relativePath = vscode.workspace.asRelativePath(file, false).replace(/\\/g, '/');
+        let ignored = false;
+        for (const rule of rules) {
+            if (this.matchesGitignoreRule(rule, relativePath)) {
+                ignored = !rule.negated;
+            }
+        }
+        return ignored;
+    }
+
+    private matchesGitignoreRule(rule: GitignoreRule, relativePath: string): boolean {
+        if (rule.directoryOnly) {
+            return this.matchesGitignorePattern(rule, relativePath) || relativePath.startsWith(`${rule.pattern}/`);
+        }
+        return this.matchesGitignorePattern(rule, relativePath);
+    }
+
+    private matchesGitignorePattern(rule: GitignoreRule, relativePath: string): boolean {
+        if (rule.anchored) {
+            return matchGlob(rule.pattern, relativePath);
+        }
+
+        if (rule.hasSlash) {
+            return matchGlob(rule.pattern, relativePath) || matchGlob(`**/${rule.pattern}`, relativePath);
+        }
+
+        return relativePath.split('/').some(segment => matchGlob(rule.pattern, segment));
     }
 
     async search(files: vscode.Uri[], query: string, includePattern?: string, excludePattern?: string): Promise<FileSearchResult[]> {
