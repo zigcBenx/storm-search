@@ -35,7 +35,7 @@ Inspired by PhpStorm's search experience, this extension provides a dual-panel v
 ### Smart Search Features
 - **File Mask Filter** - Filter by file types (e.g., `*.ts, *.js`)
 - **Directory Scope** - Search within specific folders (supports comma-separated paths)
-- **Respect VS Code Settings** - Uses your `files.exclude` and `search.exclude` settings
+- **Respect VS Code Settings** - Uses your `.gitignore`, `files.exclude`, and `search.exclude` settings
 - Live file preview with syntax highlighting while browsing results
 - Match highlighting in both result list and preview
 - File icons from your current VS Code theme
@@ -85,7 +85,7 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 - Start typing anywhere to automatically focus the search box
 - Navigate and open files without touching the mouse
 
-The search respects your VS Code `files.exclude` and `search.exclude` settings.
+The search respects your `.gitignore`, VS Code `files.exclude`, and `search.exclude` settings.
 
 
 ## Support
