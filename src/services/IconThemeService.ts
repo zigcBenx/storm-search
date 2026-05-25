@@ -16,6 +16,7 @@ export class IconThemeService {
   private iconThemePath: string | undefined;
 
   private themeJson: any = {};
+  private iconCache: Map<string, ResolvedIconDefinition | null> = new Map();
 
   constructor() {
     const config = vscode.workspace.getConfiguration("workbench")
@@ -59,7 +60,6 @@ export class IconThemeService {
   getIconFonts(): Font[] {
     const fonts: Font[] = []
 
-    console.log(this.themeJson)
     for (const font of this.themeJson.fonts || []) {
       const fontId = font.id
       const fontSrcs = font.src || []
@@ -84,13 +84,13 @@ export class IconThemeService {
 
   getIconForPath(filePath: string): ResolvedIconDefinition | null {
     const fileName = path.basename(filePath)
-    // Naive check
-    const isFile = fileName.includes('.')
-    if (isFile) {
-      return this.getIconForFileName(fileName)
-    } else {
-      return this.getIconForFolder(fileName)
+    if (this.iconCache.has(fileName)) {
+      return this.iconCache.get(fileName)!;
     }
+    const isFile = fileName.includes('.')
+    const icon = isFile ? this.getIconForFileName(fileName) : this.getIconForFolder(fileName);
+    this.iconCache.set(fileName, icon);
+    return icon;
   }
 
   private getIconForFolder(folderName: string): ResolvedIconDefinition | null {

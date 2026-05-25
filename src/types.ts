@@ -56,10 +56,3 @@ export type WebviewMessage = {
     command: 'pickDirectory';
 }
 
-export interface SearchOptions {
-    maxResults?: number;
-    maxMatchesPerFile?: number;
-    maxFilesToSearch?: number;
-    maxFileSize: number;
-    batchSize: number;
-}

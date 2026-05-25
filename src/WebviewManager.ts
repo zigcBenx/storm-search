@@ -8,7 +8,7 @@ import { IconThemeService } from './services/IconThemeService';
 
 export class WebviewManager {
     private panels: Map<string, vscode.WebviewPanel> = new Map();
-    private panelSearches: Map<string, string> = new Map();
+    private panelCancellation: Map<string, vscode.CancellationTokenSource> = new Map();
 
     private searchService: SearchService;
     private fileService: FileService;
@@ -73,9 +73,11 @@ export class WebviewManager {
     }
 
     dispose(): void {
+        this.panelCancellation.forEach(ts => { ts.cancel(); ts.dispose(); });
+        this.panelCancellation.clear();
         this.panels.forEach(panel => panel.dispose());
         this.panels.clear();
-        this.panelSearches.clear();
+
         this.disposables.forEach(d => d.dispose());
         this.syntaxHighlightService.dispose();
     }
@@ -117,7 +119,6 @@ export class WebviewManager {
 
         const iconFonts = this.iconThemeService.getIconFonts();
 
-        console.log('Icon Fonts:', iconFonts);
         panel.webview.html = getWebviewContent({
             scriptUri,
             styleUri,
@@ -129,6 +130,10 @@ export class WebviewManager {
         });
         this.setupMessageHandler(panelId, panel);
         this.setupPanelDisposal(panelId, panel);
+
+        // Warm up Shiki in the background so first preview click is instant
+        this.syntaxHighlightService.initialize().catch(() => {});
+
         return panelId;
     }
 
@@ -175,48 +180,54 @@ export class WebviewManager {
     }
 
     private async handleSearch(panelId: string, panel: vscode.WebviewPanel, query: string, includePattern?: string, excludePattern?: string): Promise<void> {
+        this.panelCancellation.get(panelId)?.cancel();
+        this.panelCancellation.get(panelId)?.dispose();
+
+        const tokenSource = new vscode.CancellationTokenSource();
+        this.panelCancellation.set(panelId, tokenSource);
+
+
+        let isFirst = true;
+        let hasResults = false;
+
         try {
-            this.panelSearches.set(panelId, query);
+            await this.searchService.search(
+                query,
+                includePattern,
+                excludePattern,
+                tokenSource.token,
+                (results) => {
+                    if (tokenSource.token.isCancellationRequested) return;
+                    hasResults = true;
 
-            const searchableFiles = await this.searchService.getSearchableFiles();
-            const searchOptions = this.searchService.getSearchOptions();
-            let resultCount = 0;
-
-            for (let i = 0; i < searchableFiles.length; i += searchOptions.batchSize) {
-                if (this.panelSearches.get(panelId) !== query) {
-                    // A new search has been initiated in this panel, abort current search
-                    return;
-                }
-
-                const batch = searchableFiles.slice(i, i + searchOptions.batchSize);
-                const results = await this.searchService.search(batch, query, includePattern, excludePattern);
-                if (results.length === 0) {
-                    continue;
-                }
-                resultCount += results.length;
-                panel.webview.postMessage({
-                    command: i === 0 ? 'newSearchResults' : 'extendSearchResults',
-                    results: results.map((result) => {
+                    const enriched = results.map((result) => {
                         const icon = this.iconThemeService.getIconForPath(result.filePath);
                         if (icon?.svgPath) {
                             icon.svgPath = panel.webview.asWebviewUri(vscode.Uri.file(icon.svgPath)).toString();
                         }
+                        return { ...result, icon };
+                    });
 
-                        return {
-                            ...result,
-                            icon
-                        }
-                    })
-                });
-            }
+                    panel.webview.postMessage({
+                        command: isFirst ? 'newSearchResults' : 'extendSearchResults',
+                        results: enriched,
+                    });
+                    isFirst = false;
+                }
+            );
 
-            if (resultCount === 0) {
-                panel.webview.postMessage({
-                    command: 'noResults'
-                });
+            if (!hasResults && !tokenSource.token.isCancellationRequested) {
+                panel.webview.postMessage({ command: 'noResults' });
             }
         } catch (error) {
-            console.error('Search error:', error);
+            if (!tokenSource.token.isCancellationRequested) {
+                console.error('Search error:', error);
+            }
+        } finally {
+            if (this.panelCancellation.get(panelId) === tokenSource) {
+                tokenSource.dispose();
+                this.panelCancellation.delete(panelId);
+            }
         }
     }
 
