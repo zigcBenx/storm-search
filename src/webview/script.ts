@@ -433,6 +433,24 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         if (group) group.classList.toggle('collapsed');
     }
 
+    function selectFirstMatchInNextFile() {
+        if (allMatches.length === 0) return;
+
+        if (selectedMatchIndex < 0) {
+            selectMatchById(0);
+            return;
+        }
+
+        const currentFile = allMatches[selectedMatchIndex].relativePath;
+
+        for (let i = selectedMatchIndex + 1; i < allMatches.length; i++) {
+            if (allMatches[i].relativePath !== currentFile) {
+                selectMatchById(allMatches[i].matchId);
+                return;
+            }
+        }
+    }
+
     function openMatchById(matchId: number, event?: MouseEvent) {
         if (matchId < 0 || matchId >= allMatches.length) return;
 
@@ -691,7 +709,9 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         // Arrow key navigation - works even when in search input
         if (e.key === 'ArrowDown' && !isInOtherInput) {
             e.preventDefault();
-            if (selectedMatchIndex < allMatches.length - 1) {
+            if (e.ctrlKey || e.metaKey) {
+                selectFirstMatchInNextFile();
+            } else if (selectedMatchIndex < allMatches.length - 1) {
                 selectMatchById(selectedMatchIndex + 1);
             }
         } else if (e.key === 'ArrowUp' && !isInOtherInput) {
