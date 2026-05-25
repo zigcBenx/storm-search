@@ -2,6 +2,14 @@
 
 import { FileSearchResult, SearchMatch, WebviewMessage } from "../types";
 
+declare global {
+    interface Window {
+        selectMatchById: (matchId: number) => void;
+        openMatchById: (matchId: number, event?: MouseEvent) => void;
+        toggleFileGroup: (el: HTMLElement) => void;
+    }
+}
+
 
 type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResult['icon'] };
 
@@ -247,6 +255,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         allFiles = new Set();
 
         results.forEach((result) => {
+            allFiles.add(result.filePath);
             result.matches.forEach((match) => {
                 allMatches.push({
                     matchId: allMatches.length,
@@ -312,6 +321,9 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             const match = allMatches[currentlyRenderedCount + i];
 
             const fileName = match.relativePath.split('/').pop() || match.relativePath;
+            const dirPath = match.relativePath.includes('/')
+                ? match.relativePath.substring(0, match.relativePath.lastIndexOf('/') + 1)
+                : '';
             const isNewFile = match.relativePath !== currentFile;
 
             if (isNewFile) {
@@ -327,7 +339,10 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
 
                 currentFile = match.relativePath;
                 html += `<div class="file-group">
-                <div class="file-header" title="${escapeHtml(match.relativePath)}">
+                <div class="file-header" title="${escapeHtml(match.relativePath)}" onclick="toggleFileGroup(this)">
+                    <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                        <path d="M2 3l3 4 3-4z"/>
+                    </svg>
                 `
 
                 if (match.icon) {
@@ -335,7 +350,6 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                         html += `<img src="${match.icon.svgPath}" class="file-icon" alt="">`
                     } else if (match.icon.fontCharacter) {
                         const fontChar = String.fromCharCode(parseInt(match.icon.fontCharacter.substring(1), 16))
-
                         html += `<div class="file-icon icon-font-${match.icon.fontId}" style="color: ${match.icon.fontColor};">${fontChar}</div>`
                     }
                 } else {
@@ -343,11 +357,12 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 }
                 html += `
                     <span class="file-name">${escapeHtml(fileName)}</span>
+                    ${dirPath ? `<span class="file-dir">${escapeHtml(dirPath)}</span>` : ''}
                 </div>`;
             }
             const highlighted = highlightText(match.preview, currentQuery, match.previewColumn);
             html += `<div class="match-item" data-match-id="${match.matchId}" onclick="selectMatchById(${match.matchId})" ondblclick="openMatchById(${match.matchId}, event)">
-                <span class="match-line-number">[${match.line}]</span>
+                <span class="match-line-number">${match.line}</span>
                 <span class="match-text">${highlighted}</span>
             </div>`;
         }
@@ -411,6 +426,12 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     // Make available globally for onclick handlers
     // @ts-ignore
     window.selectMatchById = selectMatchById;
+    window.toggleFileGroup = toggleFileGroup;
+
+    function toggleFileGroup(el: HTMLElement) {
+        const group = el.closest('.file-group') as HTMLElement;
+        if (group) group.classList.toggle('collapsed');
+    }
 
     function openMatchById(matchId: number, event?: MouseEvent) {
         if (matchId < 0 || matchId >= allMatches.length) return;
