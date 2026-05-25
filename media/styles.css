@@ -227,6 +227,12 @@ body {
     background: var(--vscode-list-hoverBackground);
 }
 
+.file-header.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+    border-left: 2px solid var(--vscode-focusBorder);
+}
+
 .chevron {
     flex-shrink: 0;
     color: var(--vscode-descriptionForeground);

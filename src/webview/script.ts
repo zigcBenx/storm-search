@@ -42,6 +42,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     let fileMask: string = '';
 
     let selectedMatchIndex = -1;
+    let isFileHeaderSelected = false;
     let currentQuery = '';
     let fileContentsCache: {
         [key: string]: {
@@ -253,6 +254,7 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
     function handleNewSearchResults(results: FileSearchResult[]) {
         allMatches = [];
         allFiles = new Set();
+        isFileHeaderSelected = false;
 
         results.forEach((result) => {
             allFiles.add(result.filePath);
@@ -396,15 +398,54 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
         return `${before}<span class="match-highlight">${match}</span>${after}`;
     }
 
+    function clearSelectionVisual() {
+        document.querySelectorAll('.match-item.selected').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('.file-header.selected').forEach(el => el.classList.remove('selected'));
+    }
+
+    function getFileGroupForMatch(matchId: number): Element | null {
+        return document.querySelector(`[data-match-id="${matchId}"]`)?.closest('.file-group') ?? null;
+    }
+
+    function isGroupCollapsed(matchId: number): boolean {
+        return getFileGroupForMatch(matchId)?.classList.contains('collapsed') ?? false;
+    }
+
+    function firstMatchIndexOfFile(filePath: string, startAt: number): number {
+        let i = startAt;
+        while (i > 0 && allMatches[i - 1].relativePath === filePath) i--;
+        return i;
+    }
+
+    function selectFileHeader(matchId: number) {
+        if (matchId < 0 || matchId >= allMatches.length) return;
+        selectedMatchIndex = matchId;
+        isFileHeaderSelected = true;
+
+        clearSelectionVisual();
+        const header = getFileGroupForMatch(matchId)?.querySelector('.file-header');
+        if (header) {
+            header.classList.add('selected');
+            header.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        const match = allMatches[matchId];
+        previewHeader.textContent = match.relativePath;
+        if (!fileContentsCache[match.filePath]) {
+            postMessage({ command: 'getFileContent', filePath: match.filePath });
+        } else {
+            displayFilePreview(match.filePath, match.line, match.column);
+        }
+    }
+
     function selectMatchById(matchId: number) {
         if (matchId < 0 || matchId >= allMatches.length) return;
 
         selectedMatchIndex = matchId;
+        isFileHeaderSelected = false;
         const match = allMatches[matchId];
 
-        document.querySelectorAll('.match-item.selected').forEach(item => {
-            item.classList.remove('selected');
-        });
+        clearSelectionVisual();
 
         const selectedItem = document.querySelector(`[data-match-id="${matchId}"]`);
         if (selectedItem) {
@@ -449,6 +490,26 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
                 return;
             }
         }
+    }
+
+    function selectFirstMatchInPrevFile() {
+        if (allMatches.length === 0 || selectedMatchIndex <= 0) return;
+
+        const currentFile = allMatches[selectedMatchIndex].relativePath;
+
+        // Walk back past all matches in the current file
+        let i = selectedMatchIndex - 1;
+        while (i > 0 && allMatches[i].relativePath === currentFile) {
+            i--;
+        }
+
+        // Now find the first match of that file
+        const prevFile = allMatches[i].relativePath;
+        while (i > 0 && allMatches[i - 1].relativePath === prevFile) {
+            i--;
+        }
+
+        selectMatchById(allMatches[i].matchId);
     }
 
     function openMatchById(matchId: number, event?: MouseEvent) {
@@ -711,13 +772,49 @@ type SearchMatchWithId = SearchMatch & { matchId: number, icon?: FileSearchResul
             e.preventDefault();
             if (e.ctrlKey || e.metaKey) {
                 selectFirstMatchInNextFile();
+            } else if (isFileHeaderSelected) {
+                selectFirstMatchInNextFile();
             } else if (selectedMatchIndex < allMatches.length - 1) {
-                selectMatchById(selectedMatchIndex + 1);
+                const nextIndex = selectedMatchIndex + 1;
+                const crossingFile = allMatches[nextIndex].relativePath !== allMatches[selectedMatchIndex].relativePath;
+                if (crossingFile && isGroupCollapsed(nextIndex)) {
+                    selectFileHeader(firstMatchIndexOfFile(allMatches[nextIndex].relativePath, nextIndex));
+                } else {
+                    selectMatchById(nextIndex);
+                }
             }
         } else if (e.key === 'ArrowUp' && !isInOtherInput) {
             e.preventDefault();
-            if (selectedMatchIndex > 0) {
-                selectMatchById(selectedMatchIndex - 1);
+            if (e.ctrlKey || e.metaKey) {
+                selectFirstMatchInPrevFile();
+            } else if (isFileHeaderSelected) {
+                const currentFile = allMatches[selectedMatchIndex].relativePath;
+                const prevIndex = firstMatchIndexOfFile(currentFile, selectedMatchIndex) - 1;
+                if (prevIndex >= 0) {
+                    if (isGroupCollapsed(prevIndex)) {
+                        selectFileHeader(firstMatchIndexOfFile(allMatches[prevIndex].relativePath, prevIndex));
+                    } else {
+                        selectMatchById(prevIndex);
+                    }
+                }
+            } else if (selectedMatchIndex > 0) {
+                const prevIndex = selectedMatchIndex - 1;
+                const crossingFile = allMatches[prevIndex].relativePath !== allMatches[selectedMatchIndex].relativePath;
+                if (crossingFile && isGroupCollapsed(prevIndex)) {
+                    selectFileHeader(firstMatchIndexOfFile(allMatches[prevIndex].relativePath, prevIndex));
+                } else {
+                    selectMatchById(prevIndex);
+                }
+            }
+        } else if (e.key === 'ArrowLeft' && !isInOtherInput && selectedMatchIndex >= 0) {
+            e.preventDefault();
+            getFileGroupForMatch(selectedMatchIndex)?.classList.add('collapsed');
+            selectFileHeader(firstMatchIndexOfFile(allMatches[selectedMatchIndex].relativePath, selectedMatchIndex));
+        } else if (e.key === 'ArrowRight' && !isInOtherInput && selectedMatchIndex >= 0) {
+            e.preventDefault();
+            getFileGroupForMatch(selectedMatchIndex)?.classList.remove('collapsed');
+            if (isFileHeaderSelected) {
+                selectMatchById(selectedMatchIndex);
             }
         } else if (e.key === 'Enter' && !isInOtherInput) {
             e.preventDefault();
