@@ -65,6 +65,10 @@ export class SearchService {
             if (excludePattern) {
                 toGlobParts(excludePattern).forEach(p => args.push('--glob', `!${p}`));
             }
+            workspaceFolders
+                .map(folder => path.join(folder.uri.fsPath, '.gitignore'))
+                .filter(gitignorePath => fs.existsSync(gitignorePath))
+                .forEach(gitignorePath => args.push('--ignore-file', gitignorePath));
 
             args.push('--', query, ...workspaceFolders.map(f => f.uri.fsPath));
 
