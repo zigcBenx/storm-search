@@ -57,24 +57,8 @@ export class SearchService {
                 return;
             }
 
-            const args = ['--json', '-i', '-F', '--no-heading'];
-
-            if (includePattern) {
-                toGlobParts(includePattern).forEach(p => args.push('--glob', p));
-            }
-            if (excludePattern) {
-                toGlobParts(excludePattern).forEach(p => args.push('--glob', `!${p}`));
-            }
-
-            args.push('--', query, ...workspaceFolders.map(f => f.uri.fsPath));
-
-            const child = cp.spawn(this.rgPath!, args, { stdio: ['ignore', 'pipe', 'ignore'] });
-
-            token.onCancellationRequested(() => child.kill());
-
             const pendingByFile = new Map<string, SearchMatch[]>();
             let totalResults = 0;
-            let buffer = '';
 
             const flush = () => {
                 if (pendingByFile.size === 0) return;
@@ -86,64 +70,103 @@ export class SearchService {
                 pendingByFile.clear();
             };
 
-            child.stdout.on('data', (chunk: Buffer) => {
-                if (token.isCancellationRequested) return;
+            const createChunkHandler = () => {
+                let buffer = '';
 
-                buffer += chunk.toString('utf8');
-                const lines = buffer.split('\n');
-                buffer = lines.pop() ?? '';
+                return (chunk: Buffer) => {
+                    if (token.isCancellationRequested) return;
 
-                for (const line of lines) {
-                    if (!line) continue;
-                    let parsed: RgMatch;
-                    try { parsed = JSON.parse(line); } catch { continue; }
-                    if (parsed.type !== 'match') continue;
+                    buffer += chunk.toString('utf8');
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() ?? '';
 
-                    const filePath = parsed.data.path.text;
-                    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
-                    const relativePath = workspaceFolder
-                        ? vscode.workspace.asRelativePath(vscode.Uri.file(filePath), false)
-                        : filePath;
+                    for (const line of lines) {
+                        if (!line) continue;
+                        let parsed: RgMatch;
+                        try { parsed = JSON.parse(line); } catch { continue; }
+                        if (parsed.type !== 'match') continue;
 
-                    const rawLine = parsed.data.lines.text;
-                    const trimmedLine = rawLine.trimStart();
-                    const leadingSpaces = rawLine.length - trimmedLine.length;
-                    const preview = trimmedLine.trimEnd();
+                        const filePath = parsed.data.path.text;
+                        const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+                        const relativePath = workspaceFolder
+                            ? vscode.workspace.asRelativePath(vscode.Uri.file(filePath), false)
+                            : filePath;
 
-                    if (!pendingByFile.has(filePath)) {
-                        pendingByFile.set(filePath, []);
+                        const rawLine = parsed.data.lines.text;
+                        const trimmedLine = rawLine.trimStart();
+                        const leadingSpaces = rawLine.length - trimmedLine.length;
+                        const preview = trimmedLine.trimEnd();
+
+                        if (!pendingByFile.has(filePath)) {
+                            pendingByFile.set(filePath, []);
+                        }
+
+                        for (const sub of parsed.data.submatches) {
+                            pendingByFile.get(filePath)!.push({
+                                filePath,
+                                relativePath,
+                                line: parsed.data.line_number,
+                                column: sub.start,
+                                preview,
+                                previewColumn: Math.max(0, sub.start - leadingSpaces),
+                            });
+                            totalResults++;
+                        }
+
+                        if (pendingByFile.size >= FLUSH_THRESHOLD) {
+                            flush();
+                        }
                     }
+                };
+            };
 
-                    for (const sub of parsed.data.submatches) {
-                        pendingByFile.get(filePath)!.push({
-                            filePath,
-                            relativePath,
-                            line: parsed.data.line_number,
-                            column: sub.start,
-                            preview,
-                            previewColumn: Math.max(0, sub.start - leadingSpaces),
-                        });
-                        totalResults++;
-                    }
-
-                    if (pendingByFile.size >= FLUSH_THRESHOLD) {
-                        flush();
-                    }
+            let remainingChildren = workspaceFolders.length;
+            const finishChild = () => {
+                remainingChildren--;
+                if (remainingChildren === 0) {
+                    flush();
+                    resolve(totalResults > 0);
                 }
-            });
+            };
 
-            child.on('close', () => {
-                flush();
-                resolve(totalResults > 0);
-            });
+            for (const folder of workspaceFolders) {
+                const args = buildRipgrepArgs(query, includePattern, excludePattern, folder.uri.fsPath);
+                const child = cp.spawn(this.rgPath!, args, {
+                    cwd: folder.uri.fsPath,
+                    stdio: ['ignore', 'pipe', 'ignore']
+                });
 
-            child.on('error', (err: Error) => {
-                console.error('ripgrep error:', err);
-                flush();
-                resolve(totalResults > 0);
-            });
+                token.onCancellationRequested(() => child.kill());
+                child.stdout.on('data', createChunkHandler());
+
+                child.on('close', finishChild);
+
+                child.on('error', (err: Error) => {
+                    console.error('ripgrep error:', err);
+                    finishChild();
+                });
+            }
         });
     }
+}
+
+export function buildRipgrepArgs(
+    query: string,
+    includePattern: string | undefined,
+    excludePattern: string | undefined,
+    workspacePath: string
+): string[] {
+    const args = ['--json', '-i', '-F', '--no-heading'];
+
+    if (includePattern) {
+        toGlobParts(includePattern).forEach(p => args.push('--glob', p));
+    }
+    if (excludePattern) {
+        toGlobParts(excludePattern).forEach(p => args.push('--glob', `!${p}`));
+    }
+
+    args.push('--', query, workspacePath);
+    return args;
 }
 
 function toGlobParts(commaPattern: string): string[] {
