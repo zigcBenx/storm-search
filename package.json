@@ -68,6 +68,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
+    "test:theme-loader": "npm run compile && node tests/themeLoader.test.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

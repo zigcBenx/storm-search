@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { createHighlighter, Highlighter, BundledLanguage } from 'shiki';
 import path from 'path';
+import { loadThemeFile } from '../themeLoader';
 
 
 type TokenColor = {
@@ -43,7 +44,7 @@ export function getTheme(themeName: string | undefined): Theme | null {
     while (themePaths.length > 0) {
         const themePath = themePaths.pop();
         if (!themePath) throw new Error("this is to make typescript happy");
-        const theme: any = require(themePath);
+        const theme: any = loadThemeFile(themePath);
         if (theme) {
             if (theme.include) {
                 themePaths.push(path.join(path.dirname(themePath), theme.include));
