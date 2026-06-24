@@ -7,6 +7,7 @@ type WebviewContentOptions = {
     styleUri: Uri,
     wordWrap?: string;
     fonts?: Font[];
+    fileMask?: string;
 }
 
 function generateFontFaceStyles(fonts?: Font[]): string {
@@ -29,7 +30,17 @@ function generateFontFaceStyles(fonts?: Font[]): string {
     `).join('\n');
 }
 
+function escapeAttribute(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 export function getWebviewContent(options: WebviewContentOptions): string {
+    const fileMask = options.fileMask || '';
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -66,6 +77,7 @@ export function getWebviewContent(options: WebviewContentOptions): string {
                 class="file-mask-input"
                 id="fileMaskInput"
                 placeholder="*.ts, *.js (comma-separated)"
+                value="${escapeAttribute(fileMask)}"
             />
         </div>
         <div class="scope-container">

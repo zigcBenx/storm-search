@@ -7,6 +7,8 @@ import { getWebviewContent } from './webview/webviewContent';
 import { IconThemeService } from './services/IconThemeService';
 
 export class WebviewManager {
+    private static readonly fileMaskStorageKey = 'stormSearch.fileMask';
+
     private panels: Map<string, vscode.WebviewPanel> = new Map();
     private panelCancellation: Map<string, vscode.CancellationTokenSource> = new Map();
 
@@ -123,6 +125,7 @@ export class WebviewManager {
             scriptUri,
             styleUri,
             wordWrap,
+            fileMask: this.getStoredFileMask(),
             fonts: iconFonts.map((font) => ({
                 ...font,
                 fontUri: panel.webview.asWebviewUri(font.fontUri)
@@ -176,7 +179,19 @@ export class WebviewManager {
             case 'pickDirectory':
                 await this.handlePickDirectory(panel);
                 break;
+
+            case 'updateFileMask':
+                await this.handleUpdateFileMask(message.fileMask);
+                break;
         }
+    }
+
+    private getStoredFileMask(): string {
+        return this.context.workspaceState.get<string>(WebviewManager.fileMaskStorageKey, '');
+    }
+
+    private async handleUpdateFileMask(fileMask: string): Promise<void> {
+        await this.context.workspaceState.update(WebviewManager.fileMaskStorageKey, fileMask);
     }
 
     private async handleSearch(panelId: string, panel: vscode.WebviewPanel, query: string, includePattern?: string, excludePattern?: string): Promise<void> {

@@ -54,5 +54,8 @@ export type WebviewMessage = {
     command: 'close';
 } | {
     command: 'pickDirectory';
+} | {
+    command: 'updateFileMask';
+    fileMask: string;
 }
 
